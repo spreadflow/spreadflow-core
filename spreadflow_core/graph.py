@@ -17,7 +17,7 @@ def contract(g, f):
     result = defaultdict(set, ((v, set()) for v in vertices))
     visited = set()
 
-    stack = zip(vertices, vertices)
+    stack = list(zip(vertices, vertices))
     while len(stack):
         pair = stack.pop()
         if pair not in visited:
