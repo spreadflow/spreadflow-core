@@ -19,36 +19,59 @@ class JobQueue(collections.Iterator):
     A job queue (and iterator) specifically designed for the twisted
     cooperative multitasking facilities.
 
-    A job can be any callable including positional and keyword arguments.
+    A job is any callable together with positional and keyword arguments.
     Results returned by a job are passed back to the caller by a deferred. If
     the job itself returns a deferred, any queued jobs on the same channel are
     blocked until a result becomes available.
 
     Example:
 
-        from __future__ import print_function
-        from twisted.internet import defer, task, reactor
-        from spreadflow_core.jobqueue import JobQueue
+        The following example illustrates how the
+        :class:`spreadflow_core.jobqueue.JobQueue` can be used together with
+        :func:`twisted.internet.task.cooperate`. Note that this function
+        returns an instance of :class:`twisted.internet.task.CooperativeTask`.
+        It can be used to pause, resume and stop the queue::
 
-        def say(message):
-            print(message)
+            from __future__ import print_function
+            from twisted.internet import defer, task, reactor
+            from spreadflow_core.jobqueue import JobQueue
 
-        def pause(seconds):
-            d = defer.Defered()
-            reactor.callLater(seconds, d.success, None)
-            return d
+            def say(message):
+                '''
+                Prints a message and returns immediately.
+                '''
+                print(message)
 
-        def stop(result):
-            reactor.stop()
+            def pause(seconds):
+                '''
+                Returns a deferred which fires after the specified amount of
+                time.
+                '''
+                d = defer.Defered()
+                reactor.callLater(seconds, d.success, None)
+                return d
 
-        queue = JobQueue()
-        task.cooperate(queue)
+            def stop(result):
+                reactor.stop()
 
-        channel = 1
-        queue.put(channel, say, 'hello')
-        queue.put(channel, say, 'world').addCallback(stop)
+            queue = JobQueue()
+            queue_task = task.cooperate(queue)
 
-        reactor.run()
+            queue.put('channel one', say, 'hello')
+            queue.put('channel one', pause, 2)
+            queue.put('channel one', say, 'world!').addCallback(done)
+
+            queue.put('channel two', pause, 1)
+            queue.put('channel two', say, 'what?')
+
+            reactor.run()
+
+        This example will generate the following output, pausing for one second
+        between every line::
+
+            hello
+            what?
+            world!
 
     """
 
@@ -83,6 +106,9 @@ class JobQueue(collections.Iterator):
         return completed
 
     def next(self):
+        """
+        Implements :meth:`iterator.next`.
+        """
         self._wakeup = defer.Deferred()
 
         readyidx = None
