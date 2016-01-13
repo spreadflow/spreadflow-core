@@ -5,10 +5,18 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import unicode_literals
 
+import sys
+
 from twisted.internet import defer
 from twisted.trial import unittest
 
 from spreadflow_core.jobqueue import JobQueue
+
+
+if sys.version_info < (3, 0):
+    _next = lambda iterator: iterator.next()
+else:
+    _next = lambda iterator: next(iterator)
 
 
 class JobQueueTestCase(unittest.TestCase):
@@ -20,10 +28,10 @@ class JobQueueTestCase(unittest.TestCase):
         """
         queue = JobQueue()
 
-        queue_ready_1 = queue.next()
+        queue_ready_1 = _next(queue)
         self.assertIsInstance(queue_ready_1, defer.Deferred)
 
-        queue_ready_2 = queue.next()
+        queue_ready_2 = _next(queue)
         self.assertIsInstance(queue_ready_2, defer.Deferred)
 
         self.assertEqual(queue_ready_1, queue_ready_2)
@@ -37,7 +45,7 @@ class JobQueueTestCase(unittest.TestCase):
         channel = object()
         queue = JobQueue()
 
-        queue_ready_1 = queue.next()
+        queue_ready_1 = _next(queue)
         self.assertIsInstance(queue_ready_1, defer.Deferred)
         self.assertFalse(queue_ready_1.called)
 
@@ -51,7 +59,7 @@ class JobQueueTestCase(unittest.TestCase):
         self.assertFalse(job_completed.called)
 
         # Iterating the queue should obviously execute the job.
-        queue_ready_2 = queue.next()
+        queue_ready_2 = _next(queue)
         self.assertTrue(job_completed.called)
 
         # After executing one job, the queue must not return a deferred in
@@ -60,7 +68,7 @@ class JobQueueTestCase(unittest.TestCase):
         self.assertIsNone(queue_ready_2)
 
         # Should return a new deferred if the queue gets empty again.
-        queue_ready_3 = queue.next()
+        queue_ready_3 = _next(queue)
         self.assertNotEqual(queue_ready_1, queue_ready_3)
         self.assertFalse(queue_ready_3.called)
 
@@ -84,7 +92,7 @@ class JobQueueTestCase(unittest.TestCase):
         queue_ready = []
         for times in range(4):
             self.assertEqual(len(results), times)
-            queue_ready = queue.next()
+            queue_ready = _next(queue)
             self.assertIsNone(queue_ready)
 
         self.assertEqual(results, [
@@ -94,5 +102,5 @@ class JobQueueTestCase(unittest.TestCase):
             (('fourth', 'additional', 'positional'), {'plus': 'some', 'key': 'words'})
         ])
 
-        queue_ready = queue.next()
+        queue_ready = _next(queue)
         self.assertIsInstance(queue_ready, defer.Deferred)

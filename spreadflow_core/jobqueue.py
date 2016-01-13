@@ -106,9 +106,9 @@ class JobQueue(collections.Iterator):
 
         return completed
 
-    def next(self):
+    def __next__(self):
         """
-        Implements :meth:`iterator.next`.
+        Implements :meth:`iterator.__next__` (Python >= 3)
         """
 
         readyidx = None
@@ -132,6 +132,12 @@ class JobQueue(collections.Iterator):
             self._wakeup = defer.Deferred()
 
         return self._wakeup
+
+    def next(self):
+        """
+        Implements :meth:`iterator.__next__` (Python < 3)
+        """
+        return self.__next__()
 
     def _job_callback(self, result, channel):
         """
