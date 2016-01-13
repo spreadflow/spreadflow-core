@@ -78,7 +78,7 @@ class JobQueue(collections.Iterator):
     def __init__(self):
         self._backlog = []
         self._jobs = {}
-        self._wakeup = defer.succeed(self)
+        self._wakeup = None
 
     def put(self, channel, func, *args, **kwds):
         """
@@ -100,8 +100,9 @@ class JobQueue(collections.Iterator):
         completed = defer.Deferred()
         self._backlog.append((channel, func, args, kwds, completed))
 
-        if not self._wakeup.called:
+        if self._wakeup:
             self._wakeup.callback(self)
+            self._wakeup = None
 
         return completed
 
@@ -109,7 +110,6 @@ class JobQueue(collections.Iterator):
         """
         Implements :meth:`iterator.next`.
         """
-        self._wakeup = defer.Deferred()
 
         readyidx = None
         for idx, item in enumerate(self._backlog):
@@ -128,8 +128,10 @@ class JobQueue(collections.Iterator):
             defered.chainDeferred(completed)
             defered.unpause()
 
-        elif not self._wakeup.called:
-            return self._wakeup
+        elif not self._wakeup:
+            self._wakeup = defer.Deferred()
+
+        return self._wakeup
 
     def _job_callback(self, result, channel):
         """
@@ -137,8 +139,8 @@ class JobQueue(collections.Iterator):
         """
         self._jobs.pop(channel)
 
-        if not self._wakeup.called:
+        if self._wakeup:
             self._wakeup.callback(self)
+            self._wakeup = None
 
         return result
-
