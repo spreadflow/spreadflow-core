@@ -13,6 +13,9 @@ import collections
 
 from twisted.internet import defer
 
+class QueueNoneReady(Exception):
+    pass
+
 class JobQueue(collections.Iterator):
     """Cooperative job queue.
 
@@ -94,7 +97,7 @@ class JobQueue(collections.Iterator):
                 execution.
 
         Returns:
-            :class:`twisted.internet.defer.Deferred` A deferred firing when the
+            :class:`twisted.internet.defer.Deferred`: A deferred firing when the
             job completed.
         """
         completed = defer.Deferred()
@@ -106,20 +109,35 @@ class JobQueue(collections.Iterator):
 
         return completed
 
+    def get(self):
+        """
+        Removes and returns the first item in the queue where the channel is
+        ready.
+
+        Returns
+            tuple: A 5-tuple containing the channel, func, args, kwds, deferred
+
+        Raises:
+            spreadflow_core.jobqueue.QueueNoneReady: Raised if there is either
+                no item ready or no channel.
+        """
+        for idx, item in enumerate(self._backlog):
+            if item[0] not in self._jobs:
+                return self._backlog.pop(idx)
+
+        raise QueueNoneReady()
+
     def __next__(self):
         """
         Implements :meth:`iterator.__next__` (Python >= 3)
         """
 
-        readyidx = None
-        for idx, item in enumerate(self._backlog):
-            if item[0] not in self._jobs:
-                readyidx = idx
-                break
-
-        if readyidx != None:
-            channel, func, args, kwds, completed = self._backlog.pop(readyidx)
-
+        try:
+            channel, func, args, kwds, completed = self.get()
+        except QueueNoneReady:
+            if not self._wakeup:
+                self._wakeup = defer.Deferred()
+        else:
             defered = defer.maybeDeferred(func, *args, **kwds)
 
             defered.pause()
@@ -127,9 +145,6 @@ class JobQueue(collections.Iterator):
             defered.addBoth(self._job_callback, channel)
             defered.chainDeferred(completed)
             defered.unpause()
-
-        elif not self._wakeup:
-            self._wakeup = defer.Deferred()
 
         return self._wakeup
 
