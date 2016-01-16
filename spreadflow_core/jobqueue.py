@@ -82,6 +82,7 @@ class JobQueue(collections.Iterator):
         self._backlog = []
         self._jobs = {}
         self._wakeup = None
+        self._stopempty = False
 
     def put(self, channel, func, *args, **kwds):
         """
@@ -102,11 +103,7 @@ class JobQueue(collections.Iterator):
         """
         completed = defer.Deferred()
         self._backlog.append((channel, func, args, kwds, completed))
-
-        if self._wakeup:
-            self._wakeup.callback(self)
-            self._wakeup = None
-
+        self._wake()
         return completed
 
     def get(self):
@@ -127,10 +124,31 @@ class JobQueue(collections.Iterator):
 
         raise QueueNoneReady()
 
+    def clear(self):
+        """
+        Clears the backlog.
+        """
+        self._backlog = []
+
+    @property
+    def stopempty(self):
+        """
+        bool: True if iterator should stop if both, the backlog gets empty and
+            there are no more pending jobs.
+        """
+        return self._stopempty
+
+    @stopempty.setter
+    def stopempty(self, value):
+        self._stopempty = bool(value)
+        self._wake()
+
     def __next__(self):
         """
         Implements :meth:`iterator.__next__` (Python >= 3)
         """
+        if self.stopempty and len(self._backlog) == 0 and len(self._jobs) == 0:
+            raise StopIteration()
 
         try:
             channel, func, args, kwds, completed = self.get()
@@ -154,14 +172,19 @@ class JobQueue(collections.Iterator):
         """
         return self.__next__()
 
+    def _wake(self):
+        """
+        Run the wakeup callback in order to signal that there are jobs waiting
+        in the backlog.
+        """
+        if self._wakeup:
+            self._wakeup.callback(self)
+            self._wakeup = None
+
     def _job_callback(self, result, channel):
         """
         Free up the channel after a job has completed.
         """
         self._jobs.pop(channel)
-
-        if self._wakeup:
-            self._wakeup.callback(self)
-            self._wakeup = None
-
+        self._wake()
         return result

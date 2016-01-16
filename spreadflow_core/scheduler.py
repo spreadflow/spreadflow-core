@@ -76,17 +76,11 @@ class Scheduler(object):
 
     @defer.inlineCallbacks
     def join(self):
-        # Stop the cooperative task.
-        _trapstop = lambda f: f.trap(task.TaskStopped)
-        _logfail = lambda f: self.log.failure('Failed to stop cooperative task', f)
-        deferred_stop = self._queue_task.whenDone()
-        deferred_stop.addErrback(_trapstop)
-        deferred_stop.addErrback(_logfail)
-        self._queue_task.stop()
-        yield deferred_stop
+        # Reset the queue task in order to prevent that new items are enqueued.
+        queue_task = self._queue_task
         self._queue_task = None
 
-        # Cancel all running jobs.
+        # Cancel all pending jobs.
         _trapcancel = lambda f: f.trap(defer.CancelledError)
         _logfail = lambda f, port, handler, item, send: self.log.failure('Failed to cancel job', f, port=port, item=item, handler=handler, send=send)
         for deferred_job, (port, handler, item, send) in self._pending.items():
@@ -94,11 +88,12 @@ class Scheduler(object):
             deferred_job.addErrback(_logfail, port, handler, item, send)
         for deferred_job in self._pending.keys():
             deferred_job.cancel()
-
-        # Wait for termination.
-        yield defer.DeferredList(self._pending.keys())
-        self._pending.clear()
         self._pending = None
+
+        # Clear the backlog and wait for queue termination.
+        self._queue.clear()
+        self._queue.stopempty = True
+        yield queue_task.whenDone()
         self._queue = None
 
         flowgraph = self.flowmap.graph()
