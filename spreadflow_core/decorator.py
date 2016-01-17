@@ -41,7 +41,6 @@ class OneshotDecorator(object):
         return _decorated_enqueue
 
     def _check_queue(self, result):
-        print len(self.queue)
         if len(self.queue) == 0:
             self._done.callback(self)
 
@@ -51,17 +50,12 @@ class OneshotDecorator(object):
 
 
 class OneshotDecoratorGenerator(object):
-    _done = defer.Deferred()
-
     def __call__(self, scheduler, reactor):
         decorator = OneshotDecorator()
-        decorator.watch(scheduler.pending).chainDeferred(self._done)
+        decorator.watch(scheduler.pending).chainDeferred(scheduler.done)
         flowgraph = scheduler.flowmap.graph()
         for v in graph.vertices(flowgraph):
             yield v, decorator
-
-    def done(self):
-        return self._done
 
 
 class ThreadpoolDecorator(object):

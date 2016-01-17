@@ -16,6 +16,7 @@ class Scheduler(object):
     _pending = None
     _queue = None
     _queue_task = None
+    _done = defer.Deferred()
     flowmap = None
     log = Logger()
 
@@ -27,10 +28,12 @@ class Scheduler(object):
         self._pending.pop(completed)
         return result
 
-    def _job_errback(self, failure):
-        # FIXME: Properly stop and pass a failure to the calling code instead
-        # of just letting the failure fall through to the global error handler.
-        return failure
+    def _job_errback(self, reason, port, item):
+        if self._queue_task:
+            self.log.failure('Job failed on {port} while processing {item}', reason, port=port, item=item)
+            return self._done.errback(reason)
+        else:
+            return reason
 
     def _enqueue(self, port, handler, item, send):
         completed = self._queue.put(port, handler, item, send)
@@ -44,11 +47,15 @@ class Scheduler(object):
         if self._queue_task and port_out in self.flowmap:
             port_in = self.flowmap[port_out]
             completed = self._enqueuer[port_in](port_in, port_in, item, self.send)
-            completed.addErrback(self._job_errback)
+            completed.addErrback(self._job_errback, port_in, item)
 
     @property
     def pending(self):
         return self._pending.viewvalues()
+
+    @property
+    def done(self):
+        return self._done
 
     @defer.inlineCallbacks
     def start(self, reactor=None):

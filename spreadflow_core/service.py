@@ -13,7 +13,6 @@ from spreadflow_core.decorator import OneshotDecoratorGenerator
 from spreadflow_core.decorator import ThreadpoolDecoratorGenerator
 from spreadflow_core.scheduler import Scheduler
 
-
 class Options(usage.Options):
     optFlags = [
         ['oneshot', 'o', "Exit after initial execution of the network"],
@@ -49,17 +48,16 @@ class SpreadFlowService(service.Service):
 
         if self.options['oneshot']:
             oneshot = OneshotDecoratorGenerator()
-            oneshot.done().addCallback(self._stoponeshot)
             flowmap.decorators.insert(0, oneshot)
 
         self._scheduler = Scheduler(flowmap)
+        self._scheduler.done.addBoth(self._stop)
         return self._scheduler.start()
 
     def stopService(self):
         super(SpreadFlowService, self).stopService()
         return self._scheduler.join()
 
-    @defer.inlineCallbacks
-    def _stoponeshot(self, result):
+    def _stop(self, result):
         from twisted.internet import reactor
         reactor.stop()
