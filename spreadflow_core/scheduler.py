@@ -12,19 +12,17 @@ from spreadflow_core import graph
 from spreadflow_core.jobqueue import JobQueue
 
 class Scheduler(object):
-    _enqueuer = None
-    _pending = None
-    _queue = None
-    _queue_done = None
-    _queue_task = None
-    _stopped = False
-    _done = defer.Deferred()
-    flowmap = None
     log = Logger()
 
     def __init__(self, flowmap):
         self.flowmap = flowmap
+        self._done = defer.Deferred()
+        self._enqueuer = None
+        self._pending = {}
         self._queue = JobQueue()
+        self._queue_done = None
+        self._queue_task = None
+        self._stopped = False
 
     def _job_callback(self, result, completed):
         self._pending.pop(completed)
@@ -44,7 +42,6 @@ class Scheduler(object):
         return completed
 
     def send(self, item, port_out):
-        assert self.flowmap, 'Must set flowmap before publish()'
         assert self._enqueuer != None, 'Must call start() before send()'
         if not self._stopped and port_out in self.flowmap:
             port_in = self.flowmap[port_out]
@@ -61,10 +58,11 @@ class Scheduler(object):
 
     @defer.inlineCallbacks
     def start(self, reactor=None):
+        assert self._enqueuer == None and not self._stopped, 'Must not call start() more than once'
+
         if reactor == None:
             from twisted.internet import reactor
 
-        self._pending = dict()
         self._queue_task = task.cooperate(self._queue)
         self._queue_done = self._queue_task.whenDone()
         self._enqueuer = collections.defaultdict(lambda: self._enqueue)
@@ -104,15 +102,12 @@ class Scheduler(object):
             deferred_job.addErrback(_logfail, port, handler, item, send)
         for deferred_job in self._pending.keys():
             deferred_job.cancel()
-        self._pending = None
 
         # Clear the backlog and wait for queue termination.
         self._queue.clear()
         self._queue.stopempty = True
         yield self._queue_done
-        self._queue = None
-        self._queue_done = None
-        self._queue_task = None
+        self._pending.clear()
 
         flowgraph = self.flowmap.graph()
 
@@ -136,3 +131,7 @@ class Scheduler(object):
             detach_job = defer.maybeDeferred(proc.detach).addErrback(_logfail)
             job_list.append(detach_job)
         yield defer.DeferredList(job_list)
+
+        self._enqueuer = None
+        self._queue_done = None
+        self._queue_task = None
