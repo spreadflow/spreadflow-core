@@ -51,8 +51,7 @@ class SpreadFlowService(service.Service):
             flowmap.decorators.insert(0, oneshot)
 
         self._scheduler = Scheduler(flowmap)
-        self._scheduler.done.addBoth(self._stop)
-        return self._scheduler.start()
+        self._scheduler.run().addBoth(self._stop)
 
     def stopService(self):
         super(SpreadFlowService, self).stopService()

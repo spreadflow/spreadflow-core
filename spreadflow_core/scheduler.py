@@ -52,12 +52,8 @@ class Scheduler(object):
     def pending(self):
         return self._pending.viewvalues()
 
-    @property
-    def done(self):
-        return self._done
-
     @defer.inlineCallbacks
-    def start(self, reactor=None):
+    def run(self, reactor=None):
         assert self._enqueuer == None and not self._stopped, 'Must not call start() more than once'
 
         if reactor == None:
@@ -81,6 +77,8 @@ class Scheduler(object):
         plan = toposort(graph.contract(flowgraph, is_startable))
         for proc_set in plan:
             yield defer.DeferredList([defer.maybeDeferred(p.start) for p in proc_set], fireOnOneErrback=True)
+
+        yield self._done
 
     def stop(self, reason):
         if not self._stopped:
