@@ -52,7 +52,7 @@ class OneshotDecorator(object):
 class OneshotDecoratorGenerator(object):
     def __call__(self, scheduler, reactor):
         decorator = OneshotDecorator()
-        decorator.watch(scheduler.pending).chainDeferred(scheduler.done)
+        decorator.watch(scheduler.pending).addBoth(scheduler.stop)
         flowgraph = scheduler.flowmap.graph()
         for v in graph.vertices(flowgraph):
             yield v, decorator

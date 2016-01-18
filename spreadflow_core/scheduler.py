@@ -15,7 +15,9 @@ class Scheduler(object):
     _enqueuer = None
     _pending = None
     _queue = None
+    _queue_done = None
     _queue_task = None
+    _stopped = False
     _done = defer.Deferred()
     flowmap = None
     log = Logger()
@@ -29,9 +31,9 @@ class Scheduler(object):
         return result
 
     def _job_errback(self, reason, port, item):
-        if self._queue_task:
+        if not self._stopped:
             self.log.failure('Job failed on {port} while processing {item}', reason, port=port, item=item)
-            return self._done.errback(reason)
+            return self.stop(reason)
         else:
             return reason
 
@@ -44,7 +46,7 @@ class Scheduler(object):
     def send(self, item, port_out):
         assert self.flowmap, 'Must set flowmap before publish()'
         assert self._enqueuer != None, 'Must call start() before send()'
-        if self._queue_task and port_out in self.flowmap:
+        if not self._stopped and port_out in self.flowmap:
             port_in = self.flowmap[port_out]
             completed = self._enqueuer[port_in](port_in, port_in, item, self.send)
             completed.addErrback(self._job_errback, port_in, item)
@@ -64,6 +66,7 @@ class Scheduler(object):
 
         self._pending = dict()
         self._queue_task = task.cooperate(self._queue)
+        self._queue_done = self._queue_task.whenDone()
         self._enqueuer = collections.defaultdict(lambda: self._enqueue)
 
         for decogen in self.flowmap.decorators:
@@ -81,11 +84,17 @@ class Scheduler(object):
         for proc_set in plan:
             yield defer.DeferredList([defer.maybeDeferred(p.start) for p in proc_set], fireOnOneErrback=True)
 
+    def stop(self, reason):
+        if not self._stopped:
+            self._stopped = True
+            return self._done.callback(reason)
+        else:
+            return reason
+
     @defer.inlineCallbacks
     def join(self):
-        # Reset the queue task in order to prevent that new items are enqueued.
-        queue_task = self._queue_task
-        self._queue_task = None
+        # Prevent that new items are enqueued.
+        self._stopped = True
 
         # Cancel all pending jobs.
         _trapcancel = lambda f: f.trap(defer.CancelledError)
@@ -100,8 +109,10 @@ class Scheduler(object):
         # Clear the backlog and wait for queue termination.
         self._queue.clear()
         self._queue.stopempty = True
-        yield queue_task.whenDone()
+        yield self._queue_done
         self._queue = None
+        self._queue_done = None
+        self._queue_task = None
 
         flowgraph = self.flowmap.graph()
 
