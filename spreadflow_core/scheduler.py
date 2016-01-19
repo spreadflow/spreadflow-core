@@ -103,6 +103,12 @@ class Scheduler(object):
         else:
             return reason
 
+    def _logfail(self, failure, fmt, *args, **kwds):
+        """
+        Errback: Logs and consumes a failure.
+        """
+        self.log.failure(fmt, failure, *args, **kwds)
+
     @defer.inlineCallbacks
     def join(self):
         # Prevent that new items are enqueued.
@@ -111,10 +117,9 @@ class Scheduler(object):
         # Cancel all pending jobs.
         self.log.debug('Cancel {pending_len} pending jobs', pending=self._pending, pending_len=len(self._pending))
         _trapcancel = lambda f: f.trap(defer.CancelledError)
-        _logfail = lambda f, port, handler, item, send: self.log.failure('Failed to cancel job', f, port=port, item=item, handler=handler, send=send)
         for deferred_job, (port, handler, item, send) in self._pending.items():
             deferred_job.addErrback(_trapcancel)
-            deferred_job.addErrback(_logfail, port, handler, item, send)
+            deferred_job.addErrback(self._logfail, 'Failed to cancel job', port=port, handler=handler, item=item, send=send)
         for deferred_job in self._pending.keys():
             deferred_job.cancel()
 
@@ -134,8 +139,7 @@ class Scheduler(object):
         for batch_num, proc_set in enumerate(plan, 1):
             job_list = []
             for proc in proc_set:
-                _logfail = lambda f, proc=proc: self.log.failure('Failed to join proc {proc}', f, proc=proc)
-                join_job = defer.maybeDeferred(proc.join).addErrback(_logfail)
+                join_job = defer.maybeDeferred(proc.join).addErrback(self._logfail, 'Failed to join proc {proc}', proc=proc)
                 job_list.append(join_job)
 
             logkwds = {
@@ -154,8 +158,7 @@ class Scheduler(object):
         procs = graph.vertices(graph.contract(flowgraph, is_detachable))
         job_list = []
         for proc in procs:
-            _logfail = lambda f, proc=proc: self.log.failure('Failed to detach proc {proc}', f, proc=proc)
-            detach_job = defer.maybeDeferred(proc.detach).addErrback(_logfail)
+            detach_job = defer.maybeDeferred(proc.detach).addErrback(self._logfail, 'Failed to detach proc {proc}', proc=proc)
             job_list.append(detach_job)
 
         self.log.debug('Detaching {procs_len} sources and services', procs=procs, procs_len=len(procs))
