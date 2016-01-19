@@ -3,10 +3,13 @@ from __future__ import division
 from __future__ import unicode_literals
 
 import os
+import tempfile
 
 from twisted.application import service
-from twisted.internet import defer
+from twisted.internet import defer, task
+from twisted.logger import globalLogPublisher, ILogObserver
 from twisted.python import usage
+from zope.interface import provider
 
 from spreadflow_core.config import config_eval
 from spreadflow_core.decorator import OneshotDecoratorGenerator
@@ -20,7 +23,8 @@ class Options(usage.Options):
     ]
 
     optParameters = [
-        ['confpath', 'c', None, 'Path to configuration file']
+        ['confpath', 'c', None, 'Path to configuration file'],
+        ['queuestatus', None, None, 'Path where status should be written to']
     ]
 
 
@@ -51,6 +55,12 @@ class SpreadFlowService(service.Service):
             flowmap.decorators.insert(0, oneshot)
 
         self._scheduler = Scheduler(flowmap)
+
+        if self.options['queuestatus']:
+            statuslog = SpreadFlowQueuestatusLogger(self.options['queuestatus'])
+            statuslog.watch(1, self._scheduler)
+            globalLogPublisher.addObserver(statuslog.logstatus)
+
         self._scheduler.run().addBoth(self._stop)
 
     def stopService(self):
@@ -60,3 +70,36 @@ class SpreadFlowService(service.Service):
     def _stop(self, result):
         from twisted.internet import reactor
         reactor.stop()
+
+class SpreadFlowQueuestatusLogger(object):
+    def __init__(self, path):
+        self.path = path
+        self.status = None
+        self.task = None
+
+    @provider(ILogObserver)
+    def logstatus(self, event):
+        if "log_failure" in event:
+            self._dumpstatus("failed")
+
+    def watch(self, interval, scheduler):
+        call = task.LoopingCall(self._dumppending, scheduler)
+        call.start(interval)
+
+    def _dumppending(self, scheduler):
+        self._dumpstatus(unicode(len(scheduler.pending)))
+
+    def _dumpstatus(self, status):
+        if self.status == "failed":
+            return
+
+        if status == None or status == self.status:
+            return
+
+        self.status = status
+
+        dirname, basename = os.path.split(self.path)
+        temp = tempfile.NamedTemporaryFile(prefix=basename, dir=dirname, delete=False)
+        temp.write(status)
+        temp.close()
+        os.rename(temp.name, self.path)
