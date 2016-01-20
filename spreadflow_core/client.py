@@ -116,7 +116,8 @@ class SchedulerClient(object):
 
     @defer.inlineCallbacks
     def join(self):
-        yield self._protocol.loseConnection()
+        if self._protocol:
+            yield self._protocol.loseConnection()
 
     def detach(self):
         self.scheduler = None
