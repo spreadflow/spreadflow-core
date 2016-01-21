@@ -4,8 +4,9 @@ Provides utility functions for spreadflow config script.
 
 import collections
 
-from spreadflow_core.flow import Flowmap
 from spreadflow_core.decorator import DecoratorGenerator
+from spreadflow_core.flow import Flowmap
+from spreadflow_core.processor import Duplicator
 
 flowmap = Flowmap()
 
@@ -29,6 +30,17 @@ def Chain(*procs):
         proc = downstream
 
     return procs
+
+def Duplicate(port_in):
+    """
+    Creates a message duplicator and connects its secondary output port to the
+    given input port.
+    """
+
+    duplicator = Duplicator()
+    Subscribe(port_in, duplicator.out_duplicate)
+    return duplicator
+
 
 def Decorate(decorator, predicate=lambda p: True):
     flowmap.decorators.append(DecoratorGenerator(decorator, predicate))
