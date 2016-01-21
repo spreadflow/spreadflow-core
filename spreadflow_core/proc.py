@@ -19,6 +19,9 @@ class SyntheticSource(object):
         for delay, item in self.items:
             reactor.callLater(delay, scheduler.send, item, self)
 
+    def detach(self):
+        pass
+
     def __call__(self, item, send):
         send(item, self)
 
@@ -70,6 +73,9 @@ class Sleep(object):
 
     def attach(self, dispatcher, reactor):
         self.sleep = lambda delay: task.deferLater(reactor, delay, lambda: self)
+
+    def detach(self):
+        self.sleep = None
 
     def msgdate_default(self, item, now):
         return item.get('date', now) if isinstance(item, Mapping) else now

@@ -6,7 +6,7 @@ import collections
 
 from spreadflow_core.decorator import DecoratorGenerator
 from spreadflow_core.flow import Flowmap
-from spreadflow_core.processor import Duplicator
+from spreadflow_core.proc import Duplicator
 
 flowmap = Flowmap()
 
