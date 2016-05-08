@@ -2,11 +2,17 @@
 Provides utility functions for spreadflow config script.
 """
 
-import collections
-
 from spreadflow_core.decorator import DecoratorGenerator
 from spreadflow_core.flow import Flowmap
 from spreadflow_core.proc import Duplicator
+
+import collections
+
+try:
+  StringType = basestring
+except NameError:
+  StringType = str
+
 
 flowmap = Flowmap()
 
@@ -14,9 +20,9 @@ def Subscribe(port_in, port_out):
     """
     Connect an input port with an output port.
     """
-    if isinstance(port_out, collections.Sequence):
+    if isinstance(port_out, collections.Sequence) and not isinstance(port_out, StringType):
         port_out = port_out[-1]
-    if isinstance(port_in, collections.Sequence):
+    if isinstance(port_in, collections.Sequence) and not isinstance(port_in, StringType):
         port_in = port_in[0]
 
     if port_out in flowmap:
@@ -46,7 +52,7 @@ def Decorate(decorator, predicate=lambda p: True):
     flowmap.decorators.append(DecoratorGenerator(decorator, predicate))
 
 def Annotate(target, **kw):
-    if isinstance(target, collections.Sequence):
+    if isinstance(target, collections.Sequence) and not isinstance(target, StringType):
         target = target[0]
     items = flowmap.annotations.get(target, {}).items() + kw.items()
     flowmap.annotations[target] = dict(items)

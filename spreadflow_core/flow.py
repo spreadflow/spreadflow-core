@@ -4,6 +4,10 @@ from __future__ import unicode_literals
 
 from collections import defaultdict, MutableMapping
 
+try:
+  StringType = basestring
+except NameError:
+  StringType = str
 
 class Flowmap(MutableMapping):
     def __init__(self):
@@ -11,9 +15,12 @@ class Flowmap(MutableMapping):
         self.annotations = {}
         self.connections = {}
         self.decorators = []
+        self.aliasmap = {}
 
     def __getitem__(self, key):
-        return self.connections[key]
+        port_out = self.resolve(key)
+        port_in_key = self.connections[port_out]
+        return self.resolve(port_in_key)
 
     def __setitem__(self, key, value):
         self.connections[key] = value
@@ -54,3 +61,8 @@ class Flowmap(MutableMapping):
                 backlog.add(port_in)
 
         return result
+
+    def resolve(self, key):
+        while isinstance(key, StringType):
+            key = self.aliasmap[key]
+        return key
