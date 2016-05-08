@@ -2,14 +2,30 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import unicode_literals
 
-from collections import defaultdict
+from collections import defaultdict, MutableMapping
 
 
-class Flowmap(dict):
+class Flowmap(MutableMapping):
     def __init__(self):
         super(Flowmap, self).__init__()
-        self.decorators = []
         self.annotations = {}
+        self.connections = {}
+        self.decorators = []
+
+    def __getitem__(self, key):
+        return self.connections[key]
+
+    def __setitem__(self, key, value):
+        self.connections[key] = value
+
+    def __delitem__(self, key):
+        del self.connections[key]
+
+    def __iter__(self):
+        return iter(self.connections)
+
+    def __len__(self):
+        return len(self.connections)
 
     def graph(self):
         result = defaultdict(set)
