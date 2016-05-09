@@ -5,7 +5,6 @@ from __future__ import unicode_literals
 import copy
 
 from collections import Mapping
-from datetime import datetime, timedelta
 
 from twisted.internet import defer, task
 from twisted.logger import Logger, LogLevel
@@ -98,30 +97,54 @@ class Duplicator(ComponentBase):
 class Sleep(object):
     """
     A processor which delays every incomming message by the specified amount.
-    The delay is calculated relative to the timestamp on the incoming message.
+
+    When sleeping, no other incoming message is accepted. Use a throttle before
+    this component in order to avoid queue overflow.
     """
 
     sleep = None
 
-    def __init__(self, delay=5, msgdate=None):
-        self.delay = timedelta(seconds=delay)
-        self.msgdate = msgdate if msgdate else self.msgdate_default
+    def __init__(self, delay):
+        self.delay = delay
 
-    def attach(self, dispatcher, reactor):
+    def attach(self, scheduler, reactor):
         self.sleep = lambda delay: task.deferLater(reactor, delay, lambda: self)
 
     def detach(self):
         self.sleep = None
 
-    def msgdate_default(self, item, now):
-        return item.get('date', now) if isinstance(item, Mapping) else now
-
     @defer.inlineCallbacks
     def __call__(self, item, send):
         assert self.sleep, 'Must call attach() before'
-        now = datetime.now()
-        delay = (item['date'] + self.delay - datetime.now()).total_seconds()
-        if delay > 0:
-            yield self.sleep(delay)
+        yield self.sleep(self.delay)
 
         send(item, self)
+
+
+class Throttle(object):
+    """
+    A processor which forwards only one incomming message per time period.
+    """
+
+    last = None
+    now = None
+
+    def __init__(self, delay, initial=0):
+        self.delay = delay
+        self.initial = initial
+
+    def attach(self, scheduler, reactor):
+        self.now = reactor.seconds
+        self.last = self.now() - self.delay + self.initial
+
+    def detach(self):
+        self.now = None
+        self.last = None
+
+    def __call__(self, item, send):
+        assert self.now, 'Must call attach() before'
+
+        now = self.now()
+        if now - self.last >= self.delay:
+            self.last = now
+            send(item, self)
