@@ -9,6 +9,65 @@ try:
 except NameError:
   StringType = str
 
+class PortCollection(object):
+    """
+    Base class for components with separate/multiple input/output ports.
+    """
+
+    @property
+    def ins(self):
+        """
+        Return a list of input ports. Default port must be first.
+        """
+        return []
+
+    @property
+    def outs(self):
+        """
+        Return a list of output ports. Default port must be last.
+        """
+        return []
+
+    @property
+    def dependencies(self):
+        """
+        Return a list of dependencies representing the internal wiring of the
+        ports.
+        """
+        return []
+
+class ComponentCollection(object):
+    """
+    Base class for components wrapping other components.
+    """
+
+    @property
+    def children(self):
+        """
+        Return a list of subcomponents.
+        """
+        return []
+
+class ComponentBase(PortCollection):
+    """
+    A process with separate/multiple input and output ports.
+    """
+
+    @property
+    def ins(self):
+        return [self]
+
+    @property
+    def outs(self):
+        return [self]
+
+    @property
+    def dependencies(self):
+        for port_out in self.outs:
+            for port_in in self.ins:
+                if port_in is not port_out:
+                    yield (port_in, port_out)
+
 class Flowmap(MutableMapping):
     def __init__(self):
         super(Flowmap, self).__init__()

@@ -10,6 +10,8 @@ from datetime import datetime, timedelta
 from twisted.internet import defer, task
 from twisted.logger import Logger, LogLevel
 
+from spreadflow_core.flow import ComponentBase, PortCollection, ComponentCollection
+
 
 class SyntheticSource(object):
     def __init__(self, items):
@@ -42,7 +44,41 @@ class DebugLog(object):
         send(item, self)
 
 
-class Duplicator(object):
+class Compound(PortCollection, ComponentCollection):
+    """
+    A process wrapping other processes.
+    """
+
+    def __init__(self, children):
+        assert len(children) == len(set(children)), 'Members must be unique'
+        self._children = children
+
+    @property
+    def ins(self):
+        ports = []
+        for member in self._children:
+            if isinstance(member, PortCollection):
+                ports.extend(member.ins)
+            else:
+                ports.append(member)
+        return ports
+
+    @property
+    def outs(self):
+        ports = []
+        for member in self._children:
+            if isinstance(member, PortCollection):
+                ports.extend(member.outs)
+            else:
+                ports.append(member)
+        return ports
+
+    @property
+    def children(self):
+        return list(self._children)
+
+
+class Duplicator(ComponentBase):
     """
     A processor capable of sending messages to another flow.
     """
@@ -55,8 +91,8 @@ class Duplicator(object):
         send(item, self)
 
     @property
-    def dependencies(self):
-        yield (self, self.out_duplicate)
+    def outs(self):
+        return [self.out_duplicate, self]
 
 
 class Sleep(object):
