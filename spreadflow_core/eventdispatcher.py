@@ -26,8 +26,8 @@ class EventDispatcher(object):
         self._counter = itertools.count()
         self._listeners = {}
 
-    def add_listener(self, event, priority, callback):
-        listeners = self._listeners.setdefault(event, [])
+    def add_listener(self, event_type, priority, callback):
+        listeners = self._listeners.setdefault(event_type, [])
         key = Key(priority, next(self._counter))
         heapq.heappush(listeners, Entry(key, callback))
         self._active.add(key)
@@ -37,9 +37,10 @@ class EventDispatcher(object):
         self._active.remove(key)
 
     @defer.inlineCallbacks
-    def dispatch(self, event, data=None, logfails=False):
-        if event in self._listeners:
-            listeners = self._listeners[event]
+    def dispatch(self, event, logfails=False):
+        event_type = type(event)
+        if event_type in self._listeners:
+            listeners = self._listeners[event_type]
             keyfunc = lambda entry: entry.key.priority
 
             for priority, group in itertools.groupby(listeners, keyfunc):
@@ -48,9 +49,9 @@ class EventDispatcher(object):
                 self.log.debug('Calling handlers with priority {priority} for {event}', event=event, priority=priority)
                 for key, callback in group:
                     if key in self._active:
-                        d = defer.maybeDeferred(callback, event, data)
+                        d = defer.maybeDeferred(callback, event)
                         if logfails:
-                            d.addErrback(self._logfail, 'Failure ignored while handling event {event}', event=event, event_data=data)
+                            d.addErrback(self._logfail, 'Failure ignored while handling event {event}', event=event)
                         batch.append(d)
 
                 if len(batch):
@@ -60,10 +61,10 @@ class EventDispatcher(object):
 
     def prune(self):
         pruned_listeners = {}
-        for event, listeners in self._listeners.items():
+        for event_type, listeners in self._listeners.items():
             listeners = [(key, callback) for key, callback in listeners if key in self._active]
             if len(listeners):
-                pruned_listeners[event] = listeners
+                pruned_listeners[event_type] = listeners
 
         self._listeners = pruned_listeners
 

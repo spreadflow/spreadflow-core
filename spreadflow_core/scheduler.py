@@ -2,6 +2,8 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import unicode_literals
 
+from collections import namedtuple
+
 from twisted.internet import defer, task
 from twisted.logger import Logger
 
@@ -14,6 +16,12 @@ class Job(object):
         self.send = send
         self.origin = origin
         self.handler = handler or port
+
+JobEvent = namedtuple('JobEvent', ['scheduler', 'job', 'completed'])
+AttachEvent = namedtuple('AttachEvent', ['scheduler', 'reactor'])
+StartEvent = namedtuple('StartEvent', ['scheduler'])
+JoinEvent = namedtuple('JoinEvent', ['scheduler'])
+DetachEvent = namedtuple('DetachEvent', ['scheduler'])
 
 class Scheduler(object):
     log = Logger()
@@ -42,7 +50,7 @@ class Scheduler(object):
     def _enqueue(self, job):
         completed = defer.Deferred()
 
-        defered = self.eventdispatcher.dispatch('job', {'scheduler': self, 'job': job, 'completed': completed})
+        defered = self.eventdispatcher.dispatch(JobEvent(scheduler=self, job=job, completed=completed))
         defered.addCallback(lambda ignored, job: self._queue.put(job.port, job.handler, job.item, job.send), job)
 
         defered.pause()
@@ -79,11 +87,11 @@ class Scheduler(object):
         self._queue_done = self._queue_task.whenDone()
 
         self.log.debug('Attaching sources and services')
-        yield self.eventdispatcher.dispatch('attach', {'scheduler': self, 'reactor': reactor})
+        yield self.eventdispatcher.dispatch(AttachEvent(scheduler=self, reactor=reactor))
         self.log.debug('Attached sources and services')
 
         self.log.debug('Starting sources and services')
-        yield self.eventdispatcher.dispatch('start')
+        yield self.eventdispatcher.dispatch(StartEvent(scheduler=self))
         self.log.debug('Started sources and services')
 
         self.log.info('Started scheduler')
@@ -127,11 +135,11 @@ class Scheduler(object):
         self.log.debug('Stopped queue')
 
         self.log.debug('Joining sources and services')
-        yield self.eventdispatcher.dispatch('join', logfails=True)
+        yield self.eventdispatcher.dispatch(JoinEvent(scheduler=self), logfails=True)
         self.log.debug('Joined sources and services')
 
         self.log.debug('Detaching sources and services')
-        yield self.eventdispatcher.dispatch('detach', logfails=True)
+        yield self.eventdispatcher.dispatch(DetachEvent(scheduler=self), logfails=True)
         self.log.debug('Detached sources and services')
 
         self._queue_done = None

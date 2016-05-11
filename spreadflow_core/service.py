@@ -13,7 +13,7 @@ from zope.interface import provider
 
 from spreadflow_core.config import config_eval
 from spreadflow_core.eventdispatcher import EventDispatcher
-from spreadflow_core.scheduler import Scheduler
+from spreadflow_core.scheduler import Scheduler, JobEvent
 
 class Options(usage.Options):
     optFlags = [
@@ -49,7 +49,7 @@ class SpreadFlowService(service.Service):
         self._eventdispatcher = EventDispatcher()
 
         if self.options['oneshot']:
-            self._eventdispatcher.add_listener('job', 0, self._oneshot_job_event_handler)
+            self._eventdispatcher.add_listener(JobEvent, 0, self._oneshot_job_event_handler)
 
         flowmap.register_event_handlers(self._eventdispatcher)
 
@@ -70,10 +70,9 @@ class SpreadFlowService(service.Service):
         from twisted.internet import reactor
         reactor.stop()
 
-    def _oneshot_job_event_handler(self, event, data):
-        completed = data['completed']
-        job = data['job']
-        scheduler = data['scheduler']
+    def _oneshot_job_event_handler(self, event):
+        scheduler = event.scheduler
+        completed = event.completed
 
         def _stop_scheduler_when_done(result):
             if len(scheduler.pending) == 0:
