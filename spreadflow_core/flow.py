@@ -76,7 +76,7 @@ class Flowmap(object):
     def __init__(self):
         super(Flowmap, self).__init__()
         self.annotations = {}
-        self.connections = {}
+        self.connections = []
         self.aliasmap = {}
 
         self._compiled_connections = None
@@ -86,9 +86,33 @@ class Flowmap(object):
         if self._compiled_connections is None:
             self._compiled_connections = {}
 
-            for port_out_key, port_in_key in self.connections.items():
-                port_out = self.resolve(port_out_key)
-                port_in = self.resolve(port_in_key)
+            for port_out, port_in in self.connections:
+                while True:
+                    if isinstance(port_out, StringType):
+                        port_out = self.aliasmap[port_out]
+                    elif isinstance(port_out, PortCollection):
+                        self.annotations.setdefault(port_out, {})
+                        if port_out is not port_out.outs[-1]:
+                            port_out = port_out.outs[-1]
+                        else:
+                            break
+                    else:
+                        break
+
+                while True:
+                    if isinstance(port_in, StringType):
+                        port_in = self.aliasmap[port_in]
+                    elif isinstance(port_in, PortCollection):
+                        self.annotations.setdefault(port_in, {})
+                        if port_in is not port_in.ins[0]:
+                            port_in = port_in.ins[0]
+                        else:
+                            break
+                    else:
+                        break
+
+                if not callable(port_in):
+                    RuntimeError('Attempting to use an port as input which is not callable')
 
                 if port_out in self._compiled_connections:
                     RuntimeError('Attempting to connect more than one input port to an output port')
