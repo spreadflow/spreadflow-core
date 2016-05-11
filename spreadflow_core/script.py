@@ -20,9 +20,9 @@ def Subscribe(port_in, port_out):
         flowmap.annotations.setdefault(port_in, {})
         port_in = port_in.ins[0]
 
-    if port_out in flowmap:
+    if port_out in flowmap.connections:
         RuntimeError('Attempting to connect more than one input port to an output port')
-    flowmap[port_out] = port_in
+    flowmap.connections[port_out] = port_in
 
 def Chain(*procs):
     compound = Compound(procs)

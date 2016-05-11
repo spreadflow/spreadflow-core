@@ -72,38 +72,37 @@ class ComponentBase(PortCollection):
                 if port_in is not port_out:
                     yield (port_in, port_out)
 
-class Flowmap(MutableMapping):
+class Flowmap(object):
     def __init__(self):
         super(Flowmap, self).__init__()
         self.annotations = {}
         self.connections = {}
         self.aliasmap = {}
 
+        self._compiled_connections = None
         self._eventhandlers = []
 
-    def __getitem__(self, key):
-        port_out = self.resolve(key)
-        port_in_key = self.connections[port_out]
-        return self.resolve(port_in_key)
+    def compile(self):
+        if self._compiled_connections is None:
+            self._compiled_connections = {}
 
-    def __setitem__(self, key, value):
-        self.connections[key] = value
+            for port_out_key, port_in_key in self.connections.items():
+                port_out = self.resolve(port_out_key)
+                port_in = self.resolve(port_in_key)
 
-    def __delitem__(self, key):
-        del self.connections[key]
+                if port_out in self._compiled_connections:
+                    RuntimeError('Attempting to connect more than one input port to an output port')
 
-    def __iter__(self):
-        return iter(self.connections)
+                self._compiled_connections[port_out] = port_in
 
-    def __len__(self):
-        return len(self.connections)
+        return self._compiled_connections.items()
 
     def graph(self):
         result = defaultdict(set)
         backlog = set()
         processed = set()
 
-        for port_out, port_in in self.iteritems():
+        for port_out, port_in in self.compile():
             result[port_out].add(port_in)
             backlog.add(port_in)
 

@@ -53,7 +53,7 @@ class SpreadFlowService(service.Service):
 
         flowmap.register_event_handlers(self._eventdispatcher)
 
-        self._scheduler = Scheduler(flowmap, self._eventdispatcher)
+        self._scheduler = Scheduler(dict(flowmap.compile()), self._eventdispatcher)
 
         if self.options['queuestatus']:
             statuslog = SpreadFlowQueuestatusLogger(self.options['queuestatus'])
