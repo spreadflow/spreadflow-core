@@ -116,7 +116,7 @@ class Scheduler(object):
 
         yield self.eventdispatcher.dispatch('join', logfails=True)
 
-        yield self.eventdispatcher.dispatch('deattach', logfails=True)
+        yield self.eventdispatcher.dispatch('detach', logfails=True)
 
         self._enqueuer = None
         self._queue_done = None
