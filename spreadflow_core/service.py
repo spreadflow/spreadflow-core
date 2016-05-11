@@ -12,7 +12,6 @@ from twisted.python import usage
 from zope.interface import provider
 
 from spreadflow_core.config import config_eval
-from spreadflow_core.decorator import OneshotDecoratorGenerator
 from spreadflow_core.decorator import ThreadpoolDecoratorGenerator
 from spreadflow_core.eventdispatcher import EventDispatcher
 from spreadflow_core.scheduler import Scheduler
@@ -49,14 +48,14 @@ class SpreadFlowService(service.Service):
 
         flowmap = config_eval(confpath)
 
+        self._eventdispatcher = EventDispatcher()
+
         if self.options['threaded']:
             flowmap.decorators.append(ThreadpoolDecoratorGenerator())
 
         if self.options['oneshot']:
-            oneshot = OneshotDecoratorGenerator()
-            flowmap.decorators.insert(0, oneshot)
+            self._eventdispatcher.add_listener('job', 0, self._oneshot_job_event_handler)
 
-        self._eventdispatcher = EventDispatcher()
         flowmap.register_event_handlers(self._eventdispatcher)
 
         self._scheduler = Scheduler(flowmap, self._eventdispatcher)
@@ -75,6 +74,18 @@ class SpreadFlowService(service.Service):
     def _stop(self, result):
         from twisted.internet import reactor
         reactor.stop()
+
+    def _oneshot_job_event_handler(self, event, data):
+        completed = data['completed']
+        job = data['job']
+        scheduler = data['scheduler']
+
+        def _stop_scheduler_when_done(result):
+            if len(scheduler.pending) == 0:
+                scheduler.stop(self)
+            return result
+
+        completed.addCallback(_stop_scheduler_when_done)
 
 class SpreadFlowQueuestatusLogger(object):
     def __init__(self, path):

@@ -30,34 +30,6 @@ class JobDebugDecorator(object):
         return failure
 
 
-class OneshotDecorator(object):
-
-    queue = None
-    _done = defer.Deferred()
-
-    def __call__(self, enqueue):
-        def _decorated_enqueue(port, handler, item, send):
-            return enqueue(port, handler, item, send).addCallback(self._check_queue)
-        return _decorated_enqueue
-
-    def _check_queue(self, result):
-        if len(self.queue) == 0:
-            self._done.callback(self)
-
-    def watch(self, queue):
-        self.queue = queue
-        return self._done
-
-
-class OneshotDecoratorGenerator(object):
-    def __call__(self, scheduler, reactor):
-        decorator = OneshotDecorator()
-        decorator.watch(scheduler.pending).addBoth(scheduler.stop)
-        flowgraph = scheduler.flowmap.graph()
-        for v in graph.vertices(flowgraph):
-            yield v, decorator
-
-
 class ThreadpoolDecorator(object):
     def __init__(self, reactor):
         threadpool = reactor.getThreadPool()
