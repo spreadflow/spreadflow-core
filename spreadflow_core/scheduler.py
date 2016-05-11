@@ -9,6 +9,13 @@ from twisted.logger import Logger
 
 from spreadflow_core.jobqueue import JobQueue
 
+class Job(object):
+    def __init__(self, port, handler, item, send):
+        self.port = port
+        self.handler = handler
+        self.item = item
+        self.send = send
+
 class Scheduler(object):
     log = Logger()
 
@@ -34,11 +41,21 @@ class Scheduler(object):
         else:
             return reason
 
+    @defer.inlineCallbacks
     def _enqueue(self, port, handler, item, send):
-        completed = self._queue.put(port, handler, item, send)
-        self._pending[completed] = (port, handler, item, send)
-        completed.addBoth(self._job_callback, completed)
-        return completed
+        completed = defer.Deferred()
+        job = Job(port, handler, item, send)
+        yield self.eventdispatcher.dispatch('job', {'scheduler': self, 'job': job, 'completed': completed})
+
+        defered = self._queue.put(job.port, job.handler, job.item, job.send)
+
+        defered.pause()
+        self._pending[completed] = job
+        defered.addBoth(self._job_callback, completed)
+        defered.chainDeferred(completed)
+        defered.unpause()
+
+        yield completed
 
     def send(self, item, port_out):
         assert self._enqueuer != None, 'Must call start() before send()'
@@ -100,9 +117,9 @@ class Scheduler(object):
         # Cancel all pending jobs.
         self.log.debug('Cancel {pending_len} pending jobs', pending=self._pending, pending_len=len(self._pending))
         _trapcancel = lambda f: f.trap(defer.CancelledError)
-        for deferred_job, (port, handler, item, send) in self._pending.items():
+        for deferred_job, job in self._pending.items():
             deferred_job.addErrback(_trapcancel)
-            deferred_job.addErrback(self._logfail, 'Failed to cancel job', port=port, handler=handler, item=item, send=send)
+            deferred_job.addErrback(self._logfail, 'Failed to cancel job', job=job)
         for deferred_job in self._pending.keys():
             deferred_job.cancel()
 
