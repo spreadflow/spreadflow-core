@@ -9,9 +9,12 @@ import collections
 
 flowmap = Flowmap()
 
-def Chain(*procs, **kw):
+def Chain(name, *procs, **kw):
     compound = Compound(procs)
+    flowmap.aliasmap[name] = compound
+
     flowmap.annotations[compound] = kw
+    flowmap.annotations[compound].setdefault('label', name)
 
     upstream = procs[0]
     for downstream in procs[1:]:
