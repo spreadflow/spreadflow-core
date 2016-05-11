@@ -77,7 +77,6 @@ class Flowmap(MutableMapping):
         super(Flowmap, self).__init__()
         self.annotations = {}
         self.connections = {}
-        self.decorators = []
         self.aliasmap = {}
 
         self._eventhandlers = []

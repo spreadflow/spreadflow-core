@@ -2,7 +2,6 @@
 Provides utility functions for spreadflow config script.
 """
 
-from spreadflow_core.decorator import DecoratorGenerator
 from spreadflow_core.flow import PortCollection, Flowmap
 from spreadflow_core.proc import Duplicator, Compound
 
@@ -46,13 +45,6 @@ def Duplicate(port_in):
     Subscribe(port_in, duplicator.out_duplicate)
     return duplicator
 
-
-def Decorate(decorator, predicate=lambda p: True):
-    flowmap.decorators.append(DecoratorGenerator(decorator, predicate))
-
 def Annotate(target, **kw):
     items = flowmap.annotations.get(target, {}).items() + kw.items()
     flowmap.annotations[target] = dict(items)
-
-def DecorateSinks(decorator, *port_in):
-    Decorate(decorator, lambda p: p in port_in)

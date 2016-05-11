@@ -80,13 +80,6 @@ class Scheduler(object):
         self._queue_done = self._queue_task.whenDone()
         self._enqueuer = collections.defaultdict(lambda: self._enqueue)
 
-        # FIXME: Reimplement decorators as events
-        self.log.debug('Applying {decogen_len} port decorator generators', decogen=self.flowmap.decorators, decogen_len=len(self.flowmap.decorators))
-        for decogen in self.flowmap.decorators:
-            for proc, decorator in decogen(self, reactor):
-                self._enqueuer[proc] = decorator(self._enqueuer[proc])
-        self.log.debug('Applied {decogen_len} port decorator generators', decogen=self.flowmap.decorators, decogen_len=len(self.flowmap.decorators))
-
         yield self.eventdispatcher.dispatch('attach', {'scheduler': self, 'reactor': reactor})
 
         yield self.eventdispatcher.dispatch('start')
