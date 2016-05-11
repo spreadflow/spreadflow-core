@@ -23,7 +23,6 @@ class Scheduler(object):
         self.flowmap = flowmap
         self.eventdispatcher = eventdispatcher
         self._done = defer.Deferred()
-        self._enqueuer = None
         self._pending = {}
         self._queue = JobQueue()
         self._queue_done = None
@@ -41,13 +40,11 @@ class Scheduler(object):
         else:
             return reason
 
-    @defer.inlineCallbacks
-    def _enqueue(self, port, handler, item, send):
+    def _enqueue(self, job):
         completed = defer.Deferred()
-        job = Job(port, handler, item, send)
-        yield self.eventdispatcher.dispatch('job', {'scheduler': self, 'job': job, 'completed': completed})
 
-        defered = self._queue.put(job.port, job.handler, job.item, job.send)
+        defered = self.eventdispatcher.dispatch('job', {'scheduler': self, 'job': job, 'completed': completed})
+        defered.addCallback(lambda ignored, job: self._queue.put(job.port, job.handler, job.item, job.send), job)
 
         defered.pause()
         self._pending[completed] = job
@@ -55,13 +52,16 @@ class Scheduler(object):
         defered.chainDeferred(completed)
         defered.unpause()
 
-        yield completed
+        return completed
 
     def send(self, item, port_out):
-        assert self._enqueuer != None, 'Must call start() before send()'
+        assert self._queue_task is not None, 'Must call start() before send()'
         if not self._stopped and port_out in self.flowmap:
             port_in = self.flowmap[port_out]
-            completed = self._enqueuer[port_in](port_in, port_in, item, self.send)
+
+            job = Job(port_in, port_in, item, self.send)
+            completed = self._enqueue(job)
+
             completed.addErrback(self._job_errback, port_in, item)
 
     @property
@@ -70,7 +70,7 @@ class Scheduler(object):
 
     @defer.inlineCallbacks
     def run(self, reactor=None):
-        assert self._enqueuer == None and not self._stopped, 'Must not call start() more than once'
+        assert self._queue_task is None and not self._stopped, 'Must not call start() more than once'
 
         if reactor == None:
             from twisted.internet import reactor
@@ -78,7 +78,6 @@ class Scheduler(object):
         self.log.info('Starting scheduler')
         self._queue_task = task.cooperate(self._queue)
         self._queue_done = self._queue_task.whenDone()
-        self._enqueuer = collections.defaultdict(lambda: self._enqueue)
 
         yield self.eventdispatcher.dispatch('attach', {'scheduler': self, 'reactor': reactor})
 
@@ -128,7 +127,6 @@ class Scheduler(object):
 
         yield self.eventdispatcher.dispatch('detach', logfails=True)
 
-        self._enqueuer = None
         self._queue_done = None
         self._queue_task = None
 
