@@ -23,14 +23,19 @@ def Chain(name, *procs, **kw):
 
     return compound
 
-def Duplicate(port_in):
+def Duplicate(port_in, **kw):
     """
     Creates a message duplicator and connects its secondary output port to the
     given input port.
     """
 
     duplicator = Duplicator()
+
+    flowmap.annotations[duplicator] = kw
+    flowmap.annotations[duplicator].setdefault('label', 'copy to ' + port_in)
+
     flowmap.connections.append((duplicator.out_duplicate, port_in))
+
     return duplicator
 
 def Annotate(target, **kw):
