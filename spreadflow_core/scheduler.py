@@ -2,19 +2,18 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import unicode_literals
 
-import collections
-
 from twisted.internet import defer, task
 from twisted.logger import Logger
 
 from spreadflow_core.jobqueue import JobQueue
 
 class Job(object):
-    def __init__(self, port, handler, item, send):
+    def __init__(self, port, item, send, origin=None, handler=None):
         self.port = port
-        self.handler = handler
         self.item = item
         self.send = send
+        self.origin = origin
+        self.handler = handler or port
 
 class Scheduler(object):
     log = Logger()
@@ -33,9 +32,9 @@ class Scheduler(object):
         self._pending.pop(completed)
         return result
 
-    def _job_errback(self, reason, port, item):
+    def _job_errback(self, reason, job):
         if not self._stopped:
-            self.log.failure('Job failed on {port} while processing {item}', reason, port=port, item=item)
+            self.log.failure('Job failed on {job.port} while processing {job.item}', reason, job=job)
             return self.stop(reason)
         else:
             return reason
@@ -59,10 +58,10 @@ class Scheduler(object):
         if not self._stopped and port_out in self.flowmap:
             port_in = self.flowmap[port_out]
 
-            job = Job(port_in, port_in, item, self.send)
+            job = Job(port_in, item, self.send, origin=port_out)
             completed = self._enqueue(job)
 
-            completed.addErrback(self._job_errback, port_in, item)
+            completed.addErrback(self._job_errback, job)
 
     @property
     def pending(self):
@@ -79,9 +78,13 @@ class Scheduler(object):
         self._queue_task = task.cooperate(self._queue)
         self._queue_done = self._queue_task.whenDone()
 
+        self.log.debug('Attaching sources and services')
         yield self.eventdispatcher.dispatch('attach', {'scheduler': self, 'reactor': reactor})
+        self.log.debug('Attached sources and services')
 
+        self.log.debug('Starting sources and services')
         yield self.eventdispatcher.dispatch('start')
+        self.log.debug('Started sources and services')
 
         self.log.info('Started scheduler')
 
@@ -123,9 +126,13 @@ class Scheduler(object):
         self._pending.clear()
         self.log.debug('Stopped queue')
 
+        self.log.debug('Joining sources and services')
         yield self.eventdispatcher.dispatch('join', logfails=True)
+        self.log.debug('Joined sources and services')
 
+        self.log.debug('Detaching sources and services')
         yield self.eventdispatcher.dispatch('detach', logfails=True)
+        self.log.debug('Detached sources and services')
 
         self._queue_done = None
         self._queue_task = None
