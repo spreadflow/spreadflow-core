@@ -14,6 +14,7 @@ from zope.interface import provider
 from spreadflow_core.config import config_eval
 from spreadflow_core.decorator import OneshotDecoratorGenerator
 from spreadflow_core.decorator import ThreadpoolDecoratorGenerator
+from spreadflow_core.eventdispatcher import EventDispatcher
 from spreadflow_core.scheduler import Scheduler
 
 class Options(usage.Options):
@@ -36,6 +37,7 @@ class SpreadFlowService(service.Service):
     def __init__(self, options):
         self.options = options
         self._scheduler = None
+        self._eventdispatcher = None
 
     def startService(self):
         super(SpreadFlowService, self).startService()
@@ -54,7 +56,10 @@ class SpreadFlowService(service.Service):
             oneshot = OneshotDecoratorGenerator()
             flowmap.decorators.insert(0, oneshot)
 
-        self._scheduler = Scheduler(flowmap)
+        self._eventdispatcher = EventDispatcher()
+        flowmap.register_event_handlers(self._eventdispatcher)
+
+        self._scheduler = Scheduler(flowmap, self._eventdispatcher)
 
         if self.options['queuestatus']:
             statuslog = SpreadFlowQueuestatusLogger(self.options['queuestatus'])

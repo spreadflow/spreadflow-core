@@ -4,6 +4,10 @@ from __future__ import unicode_literals
 
 from collections import defaultdict, MutableMapping
 
+from toposort import toposort
+
+from spreadflow_core import graph
+
 try:
   StringType = basestring
 except NameError:
@@ -76,6 +80,8 @@ class Flowmap(MutableMapping):
         self.decorators = []
         self.aliasmap = {}
 
+        self._eventhandlers = []
+
     def __getitem__(self, key):
         port_out = self.resolve(key)
         port_in_key = self.connections[port_out]
@@ -125,3 +131,61 @@ class Flowmap(MutableMapping):
         while isinstance(key, StringType):
             key = self.aliasmap[key]
         return key
+
+    @property
+    def attachable_components(self):
+        # FIXME: move to flowmap builder
+        is_attachable = lambda p: hasattr(p, 'attach') and callable(p.attach)
+        nodes = graph.vertices(graph.contract(self.graph(), is_attachable))
+        for node in nodes:
+            yield 0, node
+
+    @property
+    def startable_components(self):
+        # FIXME: move to flowmap builder
+        is_startable = lambda p: hasattr(p, 'start') and callable(p.start)
+        plan = list(toposort(graph.contract(self.graph(), is_startable)))
+        for priority, node_set in enumerate(plan):
+            for node in node_set:
+                yield priority, node
+
+    @property
+    def joinable_components(self):
+        # FIXME: move to flowmap builder
+        is_joinable = lambda p: hasattr(p, 'join') and callable(p.join)
+        plan = list(toposort(graph.reverse(graph.contract(self.graph(), is_joinable))))
+        for priority, node_set in enumerate(plan):
+            for node in node_set:
+                yield priority, node
+
+    @property
+    def detachable_components(self):
+        # FIXME: move to flowmap builder
+        is_detachable = lambda p: hasattr(p, 'detach') and callable(p.detach)
+        nodes = graph.vertices(graph.contract(self.graph(), is_detachable))
+        for node in nodes:
+            yield 0, node
+
+    def register_event_handlers(self, eventdispatcher):
+        # FIXME: move to flowmap builder
+        for priority, component in self.attachable_components:
+            key = eventdispatcher.add_listener('attach', priority, lambda event, data, component=component: component.attach(data['scheduler'], data['reactor']))
+            self._eventhandlers.append(key)
+
+        for priority, component in self.startable_components:
+            key = eventdispatcher.add_listener('start', priority, lambda event, data, component=component: component.start())
+            self._eventhandlers.append(key)
+
+        for priority, component in self.joinable_components:
+            key = eventdispatcher.add_listener('join', priority, lambda event, data, component=component: component.join())
+            self._eventhandlers.append(key)
+
+        for priority, component in self.detachable_components:
+            key = eventdispatcher.add_listener('detach', priority, lambda event, data, component=component: component.detach())
+            self._eventhandlers.append(key)
+
+    def unregister_event_handlers(self, eventdispatcher):
+        # FIXME: move to flowmap builder
+        for key in self._eventhandlers:
+            eventdispatcher.remove_listener(key)
+        eventdispatcher.prune()
