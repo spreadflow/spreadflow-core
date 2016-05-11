@@ -12,14 +12,12 @@ from twisted.python import usage
 from zope.interface import provider
 
 from spreadflow_core.config import config_eval
-from spreadflow_core.decorator import ThreadpoolDecoratorGenerator
 from spreadflow_core.eventdispatcher import EventDispatcher
 from spreadflow_core.scheduler import Scheduler
 
 class Options(usage.Options):
     optFlags = [
         ['oneshot', 'o', "Exit after initial execution of the network"],
-        ['threaded', 't', "Defer blocking processes to a threadpool"],
     ]
 
     optParameters = [
@@ -49,9 +47,6 @@ class SpreadFlowService(service.Service):
         flowmap = config_eval(confpath)
 
         self._eventdispatcher = EventDispatcher()
-
-        if self.options['threaded']:
-            flowmap.decorators.append(ThreadpoolDecoratorGenerator())
 
         if self.options['oneshot']:
             self._eventdispatcher.add_listener('job', 0, self._oneshot_job_event_handler)

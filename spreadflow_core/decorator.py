@@ -28,26 +28,3 @@ class JobDebugDecorator(object):
         if not failure.check(defer.CancelledError):
             self.log.debug('Job failed {port} with {failure} while processing {item}', failure=failure, port=port, item=item)
         return failure
-
-
-class ThreadpoolDecorator(object):
-    def __init__(self, reactor):
-        threadpool = reactor.getThreadPool()
-        self._dump_stats = threadpool.dumpStats
-        self._defer_to_thread = lambda f, *args, **kw: threads.deferToThreadPool(reactor, threadpool, f, *args, **kw)
-        self._call_from_thread = lambda f, *args, **kw: threads.blockingCallFromThread(reactor, f, *args, **kw)
-
-    def __call__(self, enqueue):
-        def _decorated_enqueue(port, handler, item, send):
-            handle_in_thread = lambda *args, **kw: self._defer_to_thread(handler, *args, **kw)
-            send_from_thread = lambda *args, **kw: self._call_from_thread(send, *args, **kw)
-            return enqueue(port, handle_in_thread, item, send_from_thread)
-        return _decorated_enqueue
-
-
-class ThreadpoolDecoratorGenerator(object):
-    def __call__(self, scheduler, reactor):
-        is_blocking = lambda port: hasattr(port, 'blocking') and port.blocking
-        flowgraph = scheduler.flowmap.graph()
-        for port in graph.vertices(flowgraph, is_blocking):
-            yield port, ThreadpoolDecorator(reactor)
