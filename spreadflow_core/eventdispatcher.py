@@ -40,6 +40,50 @@ class HandlerError(Exception):
         return 'HandlerError[{:s}, {:s}]'.format(self.handler, self.wrapped_failure)
 
 class EventDispatcher(object):
+    """ Event dispatcher.
+
+    An event dispatcher specifically designed for twisted deferreds.
+
+    Event handlers can be registered for user defined event types. An event
+    handler may return a deferred causing the dispatcher to wait on it. When
+    dispatching an event, the handlers are called according to their priority.
+    The dispatcher only advances to the next priority when all handlers with a
+    lower priority have completed.
+
+    Additional positional and keyword arguments provided while registering the
+    event handler are passed to the callback upon invocation.
+
+    Example:
+
+        The following example illustrates how to register event handlers and
+        dispatch events::
+
+            from __future__ import print_function
+            from spreadflow_core.eventdispatcher import EventDispatcher
+
+            class GreetEvent(object):
+                def __init__(self, message='hello'):
+                    self.message = message
+
+            def simple_greeter(event):
+                print(event.message)
+
+            def complex_greeter(event, prefix, suffix):
+                print(prefix + event.message + suffix)
+
+            dispatcher = EventDispatcher()
+
+            dispatcher.add_listener(GreetEvent, 99, simple_greeter)
+            dispatcher.add_listener(GreetEvent, 0, complex_greeter, 'oh, ', suffix=' world!')
+
+            dispatcher.dispatch(GreetEvent())
+
+        This example will generate the following output::
+
+            oh, hello world!
+            hello
+    """
+
     log = Logger()
 
     def __init__(self):
@@ -48,6 +92,24 @@ class EventDispatcher(object):
         self._listeners = {}
 
     def add_listener(self, event_type, priority, callback, *args, **kwds):
+        """
+        Register a callback function for events of the given type.
+
+        Args:
+            event_type: Type of the event. Pass the class in here for events
+                based on classes.
+            priority (int): Priority of this handler.
+            callback (callable): The function to call when an event of the
+                given type is dispatched.
+            *args: Positional parameters passed to the function upon
+                invocation.
+            **kwds: Keyword parameters passed to the function upon invocation.
+
+        Returns:
+            :class:`spreadflow_core.eventdispatcher.Key`: A reference to the
+            registered listener. This can be used to subsequently remove it
+            again.
+        """
         listeners = self._listeners.setdefault(event_type, [])
         key = Key(priority, next(self._counter))
         bisect.insort(listeners, Entry(key, Handler(callback, args, kwds)))
