@@ -12,6 +12,11 @@ import collections
 import itertools
 import bisect
 
+try:
+    from builtins import filter as ifilter
+except ImportError:
+    from itertools import ifilter
+
 from twisted.internet import defer
 from twisted.logger import Logger
 
@@ -58,7 +63,7 @@ class EventDispatcher(object):
             filterfunc = lambda entry: entry.key in self._active
 
             event_listeners = self._listeners[event_type]
-            filtered_listeners = itertools.ifilter(filterfunc, event_listeners)
+            filtered_listeners = ifilter(filterfunc, event_listeners)
             return itertools.groupby(filtered_listeners, keyfunc)
         else:
             return iter([])
