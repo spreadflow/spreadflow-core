@@ -12,11 +12,6 @@ import collections
 import itertools
 import bisect
 
-try:
-    from builtins import filter as ifilter
-except ImportError:
-    from itertools import ifilter
-
 from twisted.internet import defer
 from twisted.logger import Logger
 
@@ -82,12 +77,18 @@ class EventDispatcher(object):
 
             oh, hello world!
             hello
+
+        Any exception raised by a handler will immediately stop any callbacks
+        in progress unless fail_mode=FailMode.RETURN is specified. The utility
+        method log_failures provides an easy way to log any exceptions.
+
+            event = GreetEvent()
+            dispatcher.dispatch(event).addCallback(dispatcher.log_failures, event)
     """
 
     log = Logger()
 
     def __init__(self):
-        self._active = set()
         self._counter = itertools.count()
         self._listeners = {}
 
@@ -113,30 +114,76 @@ class EventDispatcher(object):
         listeners = self._listeners.setdefault(event_type, [])
         key = Key(priority, next(self._counter))
         bisect.insort(listeners, Entry(key, Handler(callback, args, kwds)))
-        self._active.add(key)
         return key
 
-    def remove_listener(self, key):
-        self._active.remove(key)
+    def remove_listener(self, event_type, key):
+        """
+        Removes an event handler from the list of listeners for the given type.
+
+        Args:
+            event_type: Type of the event. Pass the class in here for events
+                based on classes.
+            key: A key as returned by add_listeners.
+
+        Returns:
+            :class:`spreadflow_core.eventdispatcher.Handler`: A reference to
+            the removed callback, positional parameters and keyword arguments.
+        """
+        result = None
+
+        listeners = self._listeners[event_type]
+        idx = bisect.bisect(listeners, (key,), hi=len(listeners)-1)
+
+        if listeners[idx].key == key:
+            result = listeners.pop(idx)
+        else:
+            raise KeyError(key)
+
+        if len(listeners) == 0:
+            del self._listeners[event_type]
+
+        return result.handler
 
     def get_listeners(self, event_type):
-        if event_type in self._listeners:
-            keyfunc = lambda entry: entry.key.priority
-            filterfunc = lambda entry: entry.key in self._active
+        """
+        Returns an iterator over listeners for the given event type.
 
-            event_listeners = self._listeners[event_type]
-            filtered_listeners = ifilter(filterfunc, event_listeners)
-            return itertools.groupby(filtered_listeners, keyfunc)
-        else:
-            return iter([])
+        Args:
+            event_type: Type of the event. Pass the class in here for events
+            based on classes.
+
+        Returns:
+            An iterator over the listeners for the given event type.
+        """
+        return iter(self._listeners.get(event_type, []))
 
     @defer.inlineCallbacks
     def dispatch(self, event, fail_mode=FailMode.RAISE):
+        """
+        Dispatch an event, calling all the registered listeners in turn.
+
+        Args:
+            event: An event instance.
+            fail_mode: One of FailMode.RAISE (default) and FailMode.RESULT.
+
+        Returns:
+            A list of tuples (priority, list-of-results) where each entry in
+            the nested list is of the form (success, result).
+
+            When a handler fails and FailMode.RAISE is specified, errbacks with
+            a :class:`spreadflow_core.eventdispatcher.HandlerError`. When
+            FailMode.RETURN is specified, the failures are returned as part of
+            the result.
+        """
         results = []
 
         fire_on_one_errback = (fail_mode == FailMode.RAISE)
 
-        for priority, group in self.get_listeners(type(event)):
+        listeners = self.get_listeners(type(event))
+        keyfunc = lambda entry: entry.key.priority
+        grouped_listeners = itertools.groupby(listeners, keyfunc)
+
+        for priority, group in grouped_listeners:
             self.log.debug('Calling handlers with priority {priority} for {event}', event=event, priority=priority)
 
             handlers = [handler for key, handler in group]
@@ -153,16 +200,18 @@ class EventDispatcher(object):
 
         defer.returnValue(results)
 
-    def prune(self):
-        pruned_listeners = {}
-        for event_type, listeners in self._listeners.items():
-            listeners = [entry for entry in listeners if entry.key in self._active]
-            if len(listeners):
-                pruned_listeners[event_type] = listeners
-
-        self._listeners = pruned_listeners
-
     def log_failures(self, result, event):
+        """
+        Inspects the result returned by dispatch and logs any failures.
+
+        Args:
+            result: The result as returned by dispatch.
+            event: An event instance.
+
+        Returns:
+            The result as passed into the method. Thus this method also can be
+            used in the callback chain of the deferred returned by dispatch.
+        """
         for priority, group_results in result:
             for success, result in group_results:
                 if not success:

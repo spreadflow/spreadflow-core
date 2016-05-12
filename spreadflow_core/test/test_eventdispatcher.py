@@ -38,46 +38,23 @@ class EventDispatcherTestCase(TestCase):
         key_prio_2_cb_0 = dispatcher.add_listener(OtherEvent, 2, other_callback_prio_2_cb_0)
 
         # Collect callbacks from listeners list.
-        actual_handlers = []
-        for priority, group in dispatcher.get_listeners(TestEvent):
-            callbacks = [handler.callback for key, handler in group]
-            actual_handlers.append((priority, callbacks))
-
+        actual_handlers = [(key.priority, handler.callback) for key, handler in dispatcher.get_listeners(TestEvent)]
         expected_handlers = [
-            (0, [test_callback_prio_0_cb_0, test_callback_prio_0_cb_1]),
-            (1, [test_callback_prio_1_cb_0]),
+            (0, test_callback_prio_0_cb_0),
+            (0, test_callback_prio_0_cb_1),
+            (1, test_callback_prio_1_cb_0),
         ]
 
         self.assertEqual(expected_handlers, actual_handlers)
 
         # Remove one listener.
-        dispatcher.remove_listener(key_prio_0_cb_0)
+        dispatcher.remove_listener(TestEvent, key_prio_0_cb_0)
 
         # Collect callbacks from listeners list.
-        actual_handlers = []
-        for priority, group in dispatcher.get_listeners(TestEvent):
-            callbacks = [handler.callback for key, handler in group]
-            actual_handlers.append((priority, callbacks))
-
+        actual_handlers = [(key.priority, handler.callback) for key, handler in dispatcher.get_listeners(TestEvent)]
         expected_handlers = [
-            (0, [test_callback_prio_0_cb_1]),
-            (1, [test_callback_prio_1_cb_0]),
-        ]
-
-        self.assertEqual(expected_handlers, actual_handlers)
-
-        # Call prune after removal.
-        dispatcher.prune()
-
-        # Collect callbacks from listeners list.
-        actual_handlers = []
-        for priority, group in dispatcher.get_listeners(TestEvent):
-            callbacks = [handler.callback for key, handler in group]
-            actual_handlers.append((priority, callbacks))
-
-        expected_handlers = [
-            (0, [test_callback_prio_0_cb_1]),
-            (1, [test_callback_prio_1_cb_0]),
+            (0, test_callback_prio_0_cb_1),
+            (1, test_callback_prio_1_cb_0),
         ]
 
         self.assertEqual(expected_handlers, actual_handlers)
@@ -104,7 +81,7 @@ class EventDispatcherTestCase(TestCase):
         test_callback_prio_1_cb_0.assert_called_once_with(event)
         self.assertEqual(other_callback_prio_2_cb_0.call_count, 0)
 
-        dispatcher.remove_listener(key_prio_0_cb_1)
+        dispatcher.remove_listener(TestEvent, key_prio_0_cb_1)
 
         test_callback_prio_0_cb_0.reset_mock()
         test_callback_prio_0_cb_1.reset_mock()

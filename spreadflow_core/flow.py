@@ -192,22 +192,21 @@ class Flowmap(object):
         # FIXME: move to flowmap builder
         for priority, component in self.attachable_components:
             key = eventdispatcher.add_listener(scheduler.AttachEvent, priority, lambda event, component=component: component.attach(event.scheduler, event.reactor))
-            self._eventhandlers.append(key)
+            self._eventhandlers.append((scheduler.AttachEvent, key))
 
         for priority, component in self.startable_components:
             key = eventdispatcher.add_listener(scheduler.StartEvent, priority, lambda event, component=component: component.start())
-            self._eventhandlers.append(key)
+            self._eventhandlers.append((scheduler.StartEvent, key))
 
         for priority, component in self.joinable_components:
             key = eventdispatcher.add_listener(scheduler.JoinEvent, priority, lambda event, component=component: component.join())
-            self._eventhandlers.append(key)
+            self._eventhandlers.append((scheduler.JoinEvent, key))
 
         for priority, component in self.detachable_components:
             key = eventdispatcher.add_listener(scheduler.DetachEvent, priority, lambda event, component=component: component.detach())
-            self._eventhandlers.append(key)
+            self._eventhandlers.append((scheduler.DetachEvent, key))
 
     def unregister_event_handlers(self, eventdispatcher):
         # FIXME: move to flowmap builder
-        for key in self._eventhandlers:
-            eventdispatcher.remove_listener(key)
-        eventdispatcher.prune()
+        for event_type, key in self._eventhandlers:
+            eventdispatcher.remove_listener(event_type, key)
