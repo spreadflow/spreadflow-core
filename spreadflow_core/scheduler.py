@@ -8,6 +8,7 @@ from twisted.internet import defer, task
 from twisted.logger import Logger
 
 from spreadflow_core.jobqueue import JobQueue
+from spreadflow_core.eventdispatcher import FailMode
 
 class Job(object):
     def __init__(self, port, item, send, origin=None, handler=None):
@@ -135,11 +136,13 @@ class Scheduler(object):
         self.log.debug('Stopped queue')
 
         self.log.debug('Joining sources and services')
-        yield self.eventdispatcher.dispatch(JoinEvent(scheduler=self), logfails=True)
+        event = JoinEvent(scheduler=self)
+        yield self.eventdispatcher.dispatch(event, fail_mode=FailMode.RETURN).addCallback(self.eventdispatcher.log_failures, event)
         self.log.debug('Joined sources and services')
 
         self.log.debug('Detaching sources and services')
-        yield self.eventdispatcher.dispatch(DetachEvent(scheduler=self), logfails=True)
+        event = DetachEvent(scheduler=self)
+        yield self.eventdispatcher.dispatch(event, fail_mode=FailMode.RETURN).addCallback(self.eventdispatcher.log_failures, event)
         self.log.debug('Detached sources and services')
 
         self._queue_done = None

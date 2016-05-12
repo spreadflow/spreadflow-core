@@ -19,6 +19,21 @@ Key = collections.namedtuple('Key', ['priority', 'serial'])
 Handler = collections.namedtuple('Handler', ['callback', 'args', 'kwds'])
 Entry = collections.namedtuple('Entry', ['key', 'handler'])
 
+class FailMode(object):
+    RAISE = 0
+    RETURN = 1
+
+class HandlerError(Exception):
+    def __init__(self, handler, wrapped_failure):
+        self.handler = handler
+        self.wrapped_failure = wrapped_failure
+
+    def __repr__(self):
+        return 'HandlerError[{:s}, {:s}]'.format(self.handler, self.wrapped_failure.value)
+
+    def __str__(self):
+        return 'HandlerError[{:s}, {:s}]'.format(self.handler, self.wrapped_failure)
+
 class EventDispatcher(object):
     log = Logger()
 
@@ -49,33 +64,53 @@ class EventDispatcher(object):
             return iter([])
 
     @defer.inlineCallbacks
-    def dispatch(self, event, logfails=False):
+    def dispatch(self, event, fail_mode=FailMode.RAISE):
+        results = []
+
+        fire_on_one_errback = (fail_mode == FailMode.RAISE)
+
         for priority, group in self.get_listeners(type(event)):
             self.log.debug('Calling handlers with priority {priority} for {event}', event=event, priority=priority)
 
-            batch = []
-            for key, handler in group:
-                d = defer.maybeDeferred(handler.callback, event, *handler.args, **handler.kwds)
-                if logfails:
-                    d.addErrback(self._logfail, 'Failure ignored while handling event {event} with {handler}', event=event, priority=priority, key=key, handler=handler)
-                batch.append(d)
+            handlers = [handler for key, handler in group]
+            batch = [defer.maybeDeferred(handler.callback, event, *handler.args, **handler.kwds).addErrback(self._wrap_handler_error, handler) for handler in handlers]
 
             if len(batch):
-                yield defer.DeferredList(batch, fireOnOneErrback=True)
+                dl = defer.DeferredList(batch, consumeErrors=True, fireOnOneErrback=fire_on_one_errback)
+                if fire_on_one_errback:
+                    dl.addErrback(self._trap_first_error, handlers)
+                group_results = yield dl
+                results.append((priority, group_results))
 
             self.log.debug('Called {n} handlers with priority {priority} for {event}', n=len(batch), event=event, priority=priority)
+
+        defer.returnValue(results)
 
     def prune(self):
         pruned_listeners = {}
         for event_type, listeners in self._listeners.items():
-            listeners = [(key, handler) for key, handler in listeners if key in self._active]
+            listeners = [entry for entry in listeners if entry.key in self._active]
             if len(listeners):
                 pruned_listeners[event_type] = listeners
 
         self._listeners = pruned_listeners
 
-    def _logfail(self, failure, fmt, *args, **kwds):
-        """
-        Errback: Logs and consumes a failure.
-        """
-        self.log.failure(fmt, failure, *args, **kwds)
+    def log_failures(self, result, event):
+        for priority, group_results in result:
+            for success, result in group_results:
+                if not success:
+                    if result.check(HandlerError):
+                        self.log.failure('Failure while handling event {event} with {handler}', result, event=event, priority=priority, handler=result.value.handler)
+                    else:
+                        self.log.failure('Failure while handling event {event}', result, event=event, priority=priority)
+        return result
+
+    def _wrap_handler_error(self, failure, handler):
+        raise HandlerError(handler, failure)
+
+    def _trap_first_error(self, failure, handlers):
+        failure.trap(defer.FirstError)
+        if isinstance(failure.value.subFailure, HandlerError):
+            raise failure.value.subFailure
+        else:
+            raise HandlerError(handlers[failure.value.index], failure.value.subFailure)
