@@ -9,14 +9,15 @@ from __future__ import division
 from __future__ import unicode_literals
 
 import collections
-import heapq
 import itertools
+import bisect
 
 from twisted.internet import defer
 from twisted.logger import Logger
 
 Key = collections.namedtuple('Key', ['priority', 'serial'])
-Entry = collections.namedtuple('Entry', ['key', 'callback'])
+Handler = collections.namedtuple('Handler', ['callback', 'args', 'kwds'])
+Entry = collections.namedtuple('Entry', ['key', 'handler'])
 
 class EventDispatcher(object):
     log = Logger()
@@ -26,43 +27,48 @@ class EventDispatcher(object):
         self._counter = itertools.count()
         self._listeners = {}
 
-    def add_listener(self, event_type, priority, callback):
+    def add_listener(self, event_type, priority, callback, *args, **kwds):
         listeners = self._listeners.setdefault(event_type, [])
         key = Key(priority, next(self._counter))
-        heapq.heappush(listeners, Entry(key, callback))
+        bisect.insort(listeners, Entry(key, Handler(callback, args, kwds)))
         self._active.add(key)
         return key
 
     def remove_listener(self, key):
         self._active.remove(key)
 
+    def get_listeners(self, event_type):
+        if event_type in self._listeners:
+            keyfunc = lambda entry: entry.key.priority
+            filterfunc = lambda entry: entry.key in self._active
+
+            event_listeners = self._listeners[event_type]
+            filtered_listeners = itertools.ifilter(filterfunc, event_listeners)
+            return itertools.groupby(filtered_listeners, keyfunc)
+        else:
+            return iter([])
+
     @defer.inlineCallbacks
     def dispatch(self, event, logfails=False):
-        event_type = type(event)
-        if event_type in self._listeners:
-            listeners = self._listeners[event_type]
-            keyfunc = lambda entry: entry.key.priority
+        for priority, group in self.get_listeners(type(event)):
+            self.log.debug('Calling handlers with priority {priority} for {event}', event=event, priority=priority)
 
-            for priority, group in itertools.groupby(listeners, keyfunc):
-                batch = []
+            batch = []
+            for key, handler in group:
+                d = defer.maybeDeferred(handler.callback, event, *handler.args, **handler.kwds)
+                if logfails:
+                    d.addErrback(self._logfail, 'Failure ignored while handling event {event} with {handler}', event=event, priority=priority, key=key, handler=handler)
+                batch.append(d)
 
-                self.log.debug('Calling handlers with priority {priority} for {event}', event=event, priority=priority)
-                for key, callback in group:
-                    if key in self._active:
-                        d = defer.maybeDeferred(callback, event)
-                        if logfails:
-                            d.addErrback(self._logfail, 'Failure ignored while handling event {event}', event=event)
-                        batch.append(d)
+            if len(batch):
+                yield defer.DeferredList(batch, fireOnOneErrback=True)
 
-                if len(batch):
-                    yield defer.DeferredList(batch, fireOnOneErrback=True)
-
-                self.log.debug('Called {n} handlers with priority {priority} for {event}', n=len(batch), event=event, priority=priority)
+            self.log.debug('Called {n} handlers with priority {priority} for {event}', n=len(batch), event=event, priority=priority)
 
     def prune(self):
         pruned_listeners = {}
         for event_type, listeners in self._listeners.items():
-            listeners = [(key, callback) for key, callback in listeners if key in self._active]
+            listeners = [(key, handler) for key, handler in listeners if key in self._active]
             if len(listeners):
                 pruned_listeners[event_type] = listeners
 
