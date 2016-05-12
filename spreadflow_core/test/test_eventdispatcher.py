@@ -59,6 +59,23 @@ class EventDispatcherTestCase(TestCase):
 
         self.assertEqual(expected_handlers, actual_handlers)
 
+    def test_remove_non_existing_listeners(self):
+        dispatcher = EventDispatcher()
+
+        key = dispatcher.add_listener(TestEvent, 0, lambda event: None)
+
+        # Valid key on invalid event type.
+        self.assertRaises(KeyError, dispatcher.remove_listener, OtherEvent, key)
+
+        # Invalid key on valid event type.
+        self.assertRaises(KeyError, dispatcher.remove_listener, TestEvent, key._replace(priority=99))
+
+        # Really remove listener.
+        dispatcher.remove_listener(TestEvent, key)
+
+        # Double removal with valid key on valid event type.
+        self.assertRaises(KeyError, dispatcher.remove_listener, TestEvent, key)
+
     def test_dispatch_event(self):
         dispatcher = EventDispatcher()
 
