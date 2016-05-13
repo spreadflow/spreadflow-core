@@ -1,3 +1,4 @@
 coveralls
 pyflakes
 pylint<1.5
+git+git://github.com/testing-cabal/testtools.git@52b5d19191fdeaa7896a4b645ff09e96c02dbac7
