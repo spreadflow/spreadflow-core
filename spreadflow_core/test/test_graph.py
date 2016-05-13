@@ -2,8 +2,9 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import unicode_literals
 
+import unittest
+
 from spreadflow_core import graph
-from twisted.trial import unittest
 
 
 class GraphTestCase(unittest.TestCase):
