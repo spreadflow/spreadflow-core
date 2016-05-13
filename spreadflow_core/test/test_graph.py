@@ -159,3 +159,97 @@ class GraphTestCase(unittest.TestCase):
         }
         result = graph.contract(g, f)
         self.assertEqual(result, expect_g)
+
+
+    def test_vertices_accept_all(self):
+        """
+        Test that all vertices are returned if no filter was specified.
+        """
+        f = lambda v: True
+
+        g = {}
+        result = graph.vertices(g, f)
+        self.assertEqual(result, set())
+
+        g = {
+            'A': {'B'},
+        }
+        result = graph.vertices(g, f)
+        self.assertEqual(result, {'A', 'B'})
+
+        g = {
+            'A': {'B', 'C'},
+            'B': {'C'},
+        }
+        result = graph.vertices(g, f)
+        self.assertEqual(result, {'A','B','C'})
+
+
+    def test_vertices_reject_all(self):
+        """
+        Test that no vertices are returned if filter rejects all.
+        """
+        f = lambda v: False
+
+        g = {}
+        result = graph.vertices(g, f)
+        self.assertEqual(result, set())
+
+        g = {
+            'A': {'B'},
+        }
+        result = graph.vertices(g, f)
+        self.assertEqual(result, set())
+
+        g = {
+            'A': {'B', 'C'},
+            'B': {'C'},
+        }
+        result = graph.vertices(g, f)
+        self.assertEqual(result, set())
+
+
+    def test_vertices_select(self):
+        """
+        Test that only vertices are reported which are accepted by the filter.
+        """
+        f = lambda v: v in {'A', 'C'}
+
+        g = {}
+        result = graph.vertices(g, f)
+        self.assertEqual(result, set())
+
+        g = {
+            'A': {'B'},
+        }
+        result = graph.vertices(g, f)
+        self.assertEqual(result, {'A'})
+
+        g = {
+            'A': {'B', 'C'},
+            'B': {'C'},
+        }
+        result = graph.vertices(g, f)
+        self.assertEqual(result, {'A','C'})
+
+
+    def test_reverse(self):
+        """
+        Test graph reversal.
+        """
+        g = {}
+        result = graph.reverse(g)
+        self.assertEqual(result, g)
+
+        g = {
+            'A': {'B'},
+        }
+        result = graph.reverse(g)
+        self.assertEqual(result, {'B': {'A'}})
+
+        g = {
+            'A': {'B', 'C'},
+            'B': {'C'},
+        }
+        result = graph.reverse(g)
+        self.assertEqual(result, {'B': {'A'}, 'C': {'A', 'B'}})
