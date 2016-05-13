@@ -59,7 +59,7 @@ class Scheduler(object):
     def _job_errback(self, reason, job):
         if not self._stopped:
             self.log.failure('Job failed on {job.port} while processing {job.item}', reason, job=job)
-            return self.stop(reason)
+            self.stop(reason)
         else:
             return reason
 
@@ -112,15 +112,15 @@ class Scheduler(object):
 
         self.log.info('Started scheduler')
 
-        yield self._done
+        reason = yield self._done
+        defer.returnValue(reason)
 
     def stop(self, reason):
         if not self._stopped:
             self.log.info('Stopping scheduler', reason=reason)
             self._stopped = True
-            return self._done.callback(reason)
-        else:
-            return reason
+            self._done.callback(reason)
+        return reason
 
     def _logfail(self, failure, fmt, *args, **kwds):
         """
