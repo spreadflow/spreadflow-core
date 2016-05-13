@@ -4,7 +4,7 @@ from __future__ import unicode_literals
 
 from collections import namedtuple
 
-from twisted.internet import defer, task
+from twisted.internet import defer
 from twisted.logger import Logger
 
 from spreadflow_core.jobqueue import JobQueue
