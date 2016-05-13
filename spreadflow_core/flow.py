@@ -80,9 +80,12 @@ class Flowmap(object):
         self.aliasmap = {}
 
         self._compiled_connections = None
-        self._eventhandlers = []
+        self._compiled_dependencies = None
+        self._eventhandlers = None
+        self._eventhandlerkeys = []
 
     def compile(self):
+        # Build port connections.
         if self._compiled_connections is None:
             self._compiled_connections = {}
 
@@ -119,94 +122,95 @@ class Flowmap(object):
 
                 self._compiled_connections[port_out] = port_in
 
+        # Build dependency graph.
+        if self._compiled_dependencies is None:
+            self._compiled_dependencies = defaultdict(set)
+            backlog = set()
+            processed = set()
+
+            for port_out, port_in in self._compiled_connections.items():
+                self._compiled_dependencies[port_out].add(port_in)
+                backlog.add(port_in)
+
+            while len(backlog):
+                node = backlog.pop()
+                if node in processed:
+                    continue
+                else:
+                    processed.add(node)
+
+                try:
+                    arcs = tuple(node.dependencies)
+                except AttributeError:
+                    continue
+
+                for port_out, port_in in arcs:
+                    self._compiled_dependencies[port_out].add(port_in)
+                    backlog.add(port_out)
+                    backlog.add(port_in)
+
+        if self._eventhandlers is None:
+            self._eventhandlers = []
+
+            # Build attach event handlers.
+            is_attachable = lambda comp: \
+                    hasattr(comp, 'attach') and callable(comp.attach)
+            attachable_components = graph.vertices(
+                graph.contract(self._compiled_dependencies, is_attachable))
+            for comp in attachable_components:
+                callback = lambda event, comp=comp: \
+                        comp.attach(event.scheduler, event.reactor)
+                entry = (scheduler.AttachEvent, 0, callback)
+                self.annotations[comp].setdefault('events', []).append(entry)
+                self._eventhandlers.append(entry)
+
+            # Build start event handlers.
+            is_startable = lambda comp: \
+                    hasattr(comp, 'start') and callable(comp.start)
+            plan = list(toposort(
+                graph.contract(self._compiled_dependencies, is_startable)))
+            for priority, comp_set in enumerate(plan):
+                for comp in comp_set:
+                    callback = lambda event, comp=comp: comp.start()
+                    entry = (scheduler.StartEvent, priority, callback)
+                    self.annotations[comp].setdefault('events', []).append(entry)
+                    self._eventhandlers.append(entry)
+
+            # Build join event handlers.
+            is_joinable = lambda comp: \
+                    hasattr(comp, 'join') and callable(comp.join)
+            plan = list(toposort(graph.reverse(
+                graph.contract(self._compiled_dependencies, is_joinable))))
+            for priority, comp_set in enumerate(plan):
+                for comp in comp_set:
+                    callback = lambda event, comp=comp: comp.join()
+                    entry = (scheduler.JoinEvent, priority, callback)
+                    self.annotations[comp].setdefault('events', []).append(entry)
+                    self._eventhandlers.append(entry)
+
+            # Build detach event handlers.
+            is_detachable = lambda comp: \
+                    hasattr(comp, 'detach') and callable(comp.detach)
+            detachable_components = graph.vertices(
+                graph.contract(self._compiled_dependencies, is_detachable))
+            for comp in detachable_components:
+                callback = lambda event, comp=comp: comp.detach()
+                entry = (scheduler.DetachEvent, 0, callback)
+                self.annotations[comp].setdefault('events', []).append(entry)
+                self._eventhandlers.append(entry)
+
         return self._compiled_connections.items()
 
     def graph(self):
-        result = defaultdict(set)
-        backlog = set()
-        processed = set()
-
-        for port_out, port_in in self.compile():
-            result[port_out].add(port_in)
-            backlog.add(port_in)
-
-        while len(backlog):
-            node = backlog.pop()
-            if node in processed:
-                continue
-            else:
-                processed.add(node)
-
-            try:
-                arcs = tuple(node.dependencies)
-            except AttributeError:
-                continue
-
-            for port_out, port_in in arcs:
-                result[port_out].add(port_in)
-                backlog.add(port_out)
-                backlog.add(port_in)
-
-        return result
-
-    def resolve(self, key):
-        while isinstance(key, StringType):
-            key = self.aliasmap[key]
-        return key
-
-    @property
-    def attachable_components(self):
-        # FIXME: move to flowmap builder
-        is_attachable = lambda p: hasattr(p, 'attach') and callable(p.attach)
-        nodes = graph.vertices(graph.contract(self.graph(), is_attachable))
-        for node in nodes:
-            yield 0, node
-
-    @property
-    def startable_components(self):
-        # FIXME: move to flowmap builder
-        is_startable = lambda p: hasattr(p, 'start') and callable(p.start)
-        plan = list(toposort(graph.contract(self.graph(), is_startable)))
-        for priority, node_set in enumerate(plan):
-            for node in node_set:
-                yield priority, node
-
-    @property
-    def joinable_components(self):
-        # FIXME: move to flowmap builder
-        is_joinable = lambda p: hasattr(p, 'join') and callable(p.join)
-        plan = list(toposort(graph.reverse(graph.contract(self.graph(), is_joinable))))
-        for priority, node_set in enumerate(plan):
-            for node in node_set:
-                yield priority, node
-
-    @property
-    def detachable_components(self):
-        # FIXME: move to flowmap builder
-        is_detachable = lambda p: hasattr(p, 'detach') and callable(p.detach)
-        nodes = graph.vertices(graph.contract(self.graph(), is_detachable))
-        for node in nodes:
-            yield 0, node
+        self.compile()
+        return dict(self._compiled_dependencies)
 
     def register_event_handlers(self, eventdispatcher):
-        # FIXME: move to flowmap builder
-        for priority, component in self.attachable_components:
-            key = eventdispatcher.add_listener(scheduler.AttachEvent, priority, lambda event, component=component: component.attach(event.scheduler, event.reactor))
-            self._eventhandlers.append((scheduler.AttachEvent, key))
-
-        for priority, component in self.startable_components:
-            key = eventdispatcher.add_listener(scheduler.StartEvent, priority, lambda event, component=component: component.start())
-            self._eventhandlers.append((scheduler.StartEvent, key))
-
-        for priority, component in self.joinable_components:
-            key = eventdispatcher.add_listener(scheduler.JoinEvent, priority, lambda event, component=component: component.join())
-            self._eventhandlers.append((scheduler.JoinEvent, key))
-
-        for priority, component in self.detachable_components:
-            key = eventdispatcher.add_listener(scheduler.DetachEvent, priority, lambda event, component=component: component.detach())
-            self._eventhandlers.append((scheduler.DetachEvent, key))
+        self.compile()
+        for event_type, priority, callback in self._eventhandlers:
+            key = eventdispatcher.add_listener(event_type, priority, callback)
+            self._eventhandlerkeys.append((event_type, key))
 
     def unregister_event_handlers(self, eventdispatcher):
-        # FIXME: move to flowmap builder
-        for event_type, key in self._eventhandlers:
+        for event_type, key in self._eventhandlerkeys:
             eventdispatcher.remove_listener(event_type, key)

@@ -3,7 +3,7 @@ from __future__ import division
 from __future__ import print_function
 from __future__ import unicode_literals
 
-from spreadflow_core import graph
+from spreadflow_core import graph, scheduler
 from spreadflow_core.config import config_eval
 from spreadflow_core.flow import PortCollection, ComponentCollection
 from graphviz import Digraph
@@ -48,16 +48,17 @@ class ConfvizCommand(object):
         flowmap = config_eval(self.path)
         g = flowmap.graph()
 
-        is_controller = lambda n: hasattr(n, 'start') or hasattr(n, 'join')
+        get_events = lambda n, *t: [entry for entry in flowmap.annotations[n].get('events', []) if entry[0] in t]
+        is_controller = lambda n: len(get_events(n, scheduler.StartEvent, scheduler.JoinEvent))
         is_component_collection = lambda c: isinstance(c, ComponentCollection)
         is_port_collection = lambda c: isinstance(c, PortCollection)
         component_collections = set(c for c in flowmap.annotations if is_component_collection(c))
         port_collections = set(c for c in flowmap.annotations if is_port_collection(c))
         if self.compactstart:
-            g = graph.contract(g, lambda n: hasattr(n, 'start'))
-        if self.compactjoin:
-            g = graph.reverse(graph.contract(g, lambda n: hasattr(n, 'join')))
-        if not self.verbose:
+            g = graph.contract(g, lambda n: len(get_events(n, scheduler.StartEvent)))
+        elif self.compactjoin:
+            g = graph.reverse(graph.contract(g, lambda n: len(get_events(n, scheduler.JoinEvent))))
+        elif not self.verbose:
             first_in_port_collection = set(c.ins[0] for c in port_collections)
             g = graph.contract(g, lambda n: n in first_in_port_collection)
 
