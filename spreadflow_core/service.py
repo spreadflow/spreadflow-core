@@ -97,7 +97,7 @@ class SpreadFlowQueuestatusLogger(object):
         call.start(interval)
 
     def _dumppending(self, scheduler):
-        self._dumpstatus(unicode(len(scheduler.pending)))
+        self._dumpstatus(str(len(scheduler.pending)))
 
     def _dumpstatus(self, status):
         if self.status == "failed":

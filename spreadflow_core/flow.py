@@ -9,7 +9,7 @@ from toposort import toposort
 from spreadflow_core import graph, scheduler
 
 try:
-  StringType = basestring
+  StringType = basestring # pylint: disable=undefined-variable
 except NameError:
   StringType = str
 

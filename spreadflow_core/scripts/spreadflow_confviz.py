@@ -100,7 +100,7 @@ class ConfvizCommand(object):
                 dg.subgraph(sg)
 
         # Edges
-        for src, sinks in g.iteritems():
+        for src, sinks in g.items():
             for sink in sinks:
                 dg.edge(str(hash(src)), str(hash(sink)))
 

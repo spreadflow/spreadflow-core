@@ -74,7 +74,7 @@ class Scheduler(object):
 
     @property
     def pending(self):
-        return self._pending.viewvalues()
+        return self._pending.items()
 
     @defer.inlineCallbacks
     def run(self, reactor=None):
