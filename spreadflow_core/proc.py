@@ -4,8 +4,6 @@ from __future__ import unicode_literals
 
 import copy
 
-from collections import Mapping
-
 from twisted.internet import defer, task
 from twisted.logger import Logger, LogLevel
 

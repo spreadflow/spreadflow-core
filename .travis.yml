@@ -10,6 +10,8 @@ install:
   - pip install -r test-requirements.txt
   - pip install -e .[tests]
 script:
+  - pylint --errors-only spreadflow_core
+  - pyflakes spreadflow_core
   - coverage run `which trial` spreadflow_core
 after_success:
   - coveralls

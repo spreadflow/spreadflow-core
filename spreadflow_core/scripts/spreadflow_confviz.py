@@ -6,7 +6,6 @@ from __future__ import unicode_literals
 from spreadflow_core import graph
 from spreadflow_core.config import config_eval
 from spreadflow_core.flow import PortCollection, ComponentCollection
-from collections import defaultdict
 from graphviz import Digraph
 from pprint import pformat
 from toposort import toposort, toposort_flatten
@@ -111,7 +110,7 @@ class ConfvizCommand(object):
             except TypeError:
                 tooltip = ''
             label = flowmap.annotations.get(n, {}).get('label', self._strip_angle_brackets(str(n)))
-            node = dg.node(str(hash(n)), label=label, tooltip=tooltip, fontcolor='blue' if is_controller(n) else 'black')
+            dg.node(str(hash(n)), label=label, tooltip=tooltip, fontcolor='blue' if is_controller(n) else 'black')
 
         print(dg.pipe(format='svg'), file=self._out)
         return 0

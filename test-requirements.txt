@@ -1,0 +1,2 @@
+coveralls
+pylint<1.5

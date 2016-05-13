@@ -3,8 +3,9 @@ from __future__ import division
 from __future__ import unicode_literals
 
 from mock import Mock
-from testtools import TestCase, matchers, twistedsupport
-from twisted.internet import defer
+from testtools import matchers, twistedsupport
+from testtools.assertions import assert_that
+from unittest import TestCase
 
 from spreadflow_core.eventdispatcher import EventDispatcher, HandlerError, FailMode
 
@@ -28,14 +29,14 @@ class EventDispatcherTestCase(TestCase):
         other_callback_prio_2_cb_0 = Mock()
 
         # Register callbacks, first priority 1 ...
-        key_prio_1_cb_0 = dispatcher.add_listener(TestEvent, 1, test_callback_prio_1_cb_0)
+        dispatcher.add_listener(TestEvent, 1, test_callback_prio_1_cb_0)
 
         # ... aftwerwards priority 0 ...
         key_prio_0_cb_0 = dispatcher.add_listener(TestEvent, 0, test_callback_prio_0_cb_0)
-        key_prio_0_cb_1 = dispatcher.add_listener(TestEvent, 0, test_callback_prio_0_cb_1)
+        dispatcher.add_listener(TestEvent, 0, test_callback_prio_0_cb_1)
 
         # ... and finally priority 2 for another event.
-        key_prio_2_cb_0 = dispatcher.add_listener(OtherEvent, 2, other_callback_prio_2_cb_0)
+        dispatcher.add_listener(OtherEvent, 2, other_callback_prio_2_cb_0)
 
         # Collect callbacks from listeners list.
         actual_handlers = [(key.priority, handler.callback) for key, handler in dispatcher.get_listeners(TestEvent)]
@@ -84,10 +85,10 @@ class EventDispatcherTestCase(TestCase):
         test_callback_prio_1_cb_0 = Mock()
         other_callback_prio_2_cb_0 = Mock()
 
-        key_prio_0_cb_0 = dispatcher.add_listener(TestEvent, 0, test_callback_prio_0_cb_0)
+        dispatcher.add_listener(TestEvent, 0, test_callback_prio_0_cb_0)
         key_prio_0_cb_1 = dispatcher.add_listener(TestEvent, 0, test_callback_prio_0_cb_1)
-        key_prio_1_cb_0 = dispatcher.add_listener(TestEvent, 1, test_callback_prio_1_cb_0)
-        key_prio_2_cb_0 = dispatcher.add_listener(OtherEvent, 2, other_callback_prio_2_cb_0)
+        dispatcher.add_listener(TestEvent, 1, test_callback_prio_1_cb_0)
+        dispatcher.add_listener(OtherEvent, 2, other_callback_prio_2_cb_0)
 
         event = TestEvent()
         d = dispatcher.dispatch(event)
@@ -129,7 +130,7 @@ class EventDispatcherTestCase(TestCase):
         d = dispatcher.dispatch(event)
 
         matcher = matchers.AfterPreprocessing(lambda f: f.value, matchers.IsInstance(HandlerError))
-        self.assertThat(d, twistedsupport.failed(matcher))
+        assert_that(d, twistedsupport.failed(matcher))
 
     def test_dispatch_with_return_fails(self):
         dispatcher = EventDispatcher()
@@ -162,7 +163,7 @@ class EventDispatcherTestCase(TestCase):
             ]),
         ])
 
-        self.assertThat(d, twistedsupport.succeeded(matcher))
+        assert_that(d, twistedsupport.succeeded(matcher))
 
     def test_dispatch_with_args_kwds(self):
         dispatcher = EventDispatcher()

@@ -3,7 +3,7 @@ from __future__ import division
 from __future__ import unicode_literals
 
 from mock import Mock, call
-from testtools import TestCase
+from unittest import TestCase
 from twisted.internet import task
 
 from spreadflow_core.scheduler import Scheduler

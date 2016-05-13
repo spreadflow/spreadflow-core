@@ -2,14 +2,17 @@
 Provides utility functions for spreadflow config script.
 """
 
-from spreadflow_core.flow import PortCollection, Flowmap
+from spreadflow_core.flow import Flowmap
 from spreadflow_core.proc import Duplicator, Compound
 
-import collections
+flowmap = Flowmap() # pylint: disable=C0103
 
-flowmap = Flowmap()
+def Chain(name, *procs, **kw): # pylint: disable=C0103
+    """
+    Forms a chain of the given components by connecting the default input port
+    to the default output port of its predecessor.
+    """
 
-def Chain(name, *procs, **kw):
     compound = Compound(procs)
     flowmap.aliasmap[name] = compound
 
@@ -23,7 +26,7 @@ def Chain(name, *procs, **kw):
 
     return compound
 
-def Duplicate(port_in, **kw):
+def Duplicate(port_in, **kw): # pylint: disable=C0103
     """
     Creates a message duplicator and connects its secondary output port to the
     given input port.
@@ -38,6 +41,10 @@ def Duplicate(port_in, **kw):
 
     return duplicator
 
-def Annotate(target, **kw):
+def Annotate(target, **kw): # pylint: disable=C0103
+    """
+    Adds key value pairs as annotations to the given port or component.
+    """
+
     items = flowmap.annotations.get(target, {}).items() + kw.items()
     flowmap.annotations[target] = dict(items)

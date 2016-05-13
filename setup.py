@@ -1,7 +1,6 @@
 from setuptools import setup
 
 tests_require = [
-    'coveralls',
     'mock',
     'testtools'
 ]

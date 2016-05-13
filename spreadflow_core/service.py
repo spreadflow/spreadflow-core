@@ -6,7 +6,7 @@ import os
 import tempfile
 
 from twisted.application import service
-from twisted.internet import defer, task
+from twisted.internet import task
 from twisted.logger import globalLogPublisher, ILogObserver
 from twisted.python import usage
 from zope.interface import provider

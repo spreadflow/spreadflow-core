@@ -8,7 +8,7 @@ from __future__ import unicode_literals
 import sys
 
 from twisted.internet import defer
-from twisted.trial import unittest
+import unittest
 
 from spreadflow_core.jobqueue import JobQueue
 

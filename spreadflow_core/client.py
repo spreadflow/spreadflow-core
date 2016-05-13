@@ -71,7 +71,7 @@ class SchedulerClientProtocol(protocol.Protocol):
     def dataReceived(self, data):
         self._parser.push(data)
         for msg in self._parser.messages():
-            self.factory.dispatch(msg)
+            self.factory.dispatch(msg) # pylint: disable=no-member
 
     def connectionLost(self, reason):
         self.connected = 0
