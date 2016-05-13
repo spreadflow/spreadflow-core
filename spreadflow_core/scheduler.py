@@ -38,9 +38,13 @@ DetachEvent = namedtuple('DetachEvent', ['scheduler'])
 class Scheduler(object):
     log = Logger()
 
-    def __init__(self, flowmap, eventdispatcher):
+    def __init__(self, flowmap, eventdispatcher, cooperate=None):
+        if cooperate is None:
+            from twisted.internet.task import cooperate
+
         self.flowmap = flowmap
         self.eventdispatcher = eventdispatcher
+        self.cooperate = cooperate
         self._done = defer.Deferred()
         self._pending = {}
         self._queue = JobQueue()
@@ -95,7 +99,7 @@ class Scheduler(object):
             from twisted.internet import reactor
 
         self.log.info('Starting scheduler')
-        self._queue_task = task.cooperate(self._queue)
+        self._queue_task = self.cooperate(self._queue)
         self._queue_done = self._queue_task.whenDone()
 
         self.log.debug('Attaching sources and services')
