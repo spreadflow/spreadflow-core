@@ -33,12 +33,6 @@ class GraphTestCase(unittest.TestCase):
         result = graph.contract(g, f)
         self.assertEqual(result, g)
 
-        g = {
-            'A': {'B', 'C'},
-            'B': {'C'},
-        }
-        result = graph.contract(g, f)
-        self.assertEqual(result, g)
 
     def test_contract_empty(self):
         """
@@ -53,13 +47,6 @@ class GraphTestCase(unittest.TestCase):
 
         g = {
             'A': {'B'},
-        }
-        result = graph.contract(g, f)
-        self.assertEqual(result, {})
-
-        g = {
-            'A': {'B', 'C'},
-            'B': {'C'},
         }
         result = graph.contract(g, f)
         self.assertEqual(result, {})
