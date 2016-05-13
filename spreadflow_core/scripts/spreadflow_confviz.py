@@ -79,8 +79,8 @@ class ConfvizCommand(object):
             for c in toposort_flatten(component_tree):
                 if is_component_collection(c) or (self.verbose and is_port_collection(c)):
                     sg = Digraph('cluster_{:s}'.format(str(hash(c))))
-                    label = flowmap.annotations.get(c, {}).get('label', self._strip_angle_brackets(str(c)))
-                    tooltip = flowmap.annotations.get(c, {}).get('description', repr(c) + "\n" + pformat(vars(c)))
+                    label = flowmap.annotations[c].get('label', self._strip_angle_brackets(str(c)))
+                    tooltip = flowmap.annotations[c].get('description', repr(c) + "\n" + pformat(vars(c)))
                     sg.attr('graph', label=label, tooltip=tooltip, color="blue")
 
                     if is_port_collection(c):
@@ -106,10 +106,10 @@ class ConfvizCommand(object):
         # Tooltips
         for n in graph.vertices(g):
             try:
-                tooltip = flowmap.annotations.get(n, {}).get('description', repr(n) + "\n" + pformat(vars(n)))
+                tooltip = flowmap.annotations[n].get('description', repr(n) + "\n" + pformat(vars(n)))
             except TypeError:
                 tooltip = ''
-            label = flowmap.annotations.get(n, {}).get('label', self._strip_angle_brackets(str(n)))
+            label = flowmap.annotations[n].get('label', self._strip_angle_brackets(str(n)))
             dg.node(str(hash(n)), label=label, tooltip=tooltip, fontcolor='blue' if is_controller(n) else 'black')
 
         print(dg.pipe(format='svg'), file=self._out)

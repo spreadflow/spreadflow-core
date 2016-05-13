@@ -75,7 +75,7 @@ class ComponentBase(PortCollection):
 class Flowmap(object):
     def __init__(self):
         super(Flowmap, self).__init__()
-        self.annotations = {}
+        self.annotations = defaultdict(dict)
         self.connections = []
         self.aliasmap = {}
 

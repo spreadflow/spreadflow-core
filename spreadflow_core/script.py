@@ -46,5 +46,5 @@ def Annotate(target, **kw): # pylint: disable=C0103
     Adds key value pairs as annotations to the given port or component.
     """
 
-    items = flowmap.annotations.get(target, {}).items() + kw.items()
+    items = flowmap.annotations[target].items() + kw.items()
     flowmap.annotations[target] = dict(items)
