@@ -18,6 +18,17 @@ class Job(object):
         self.origin = origin
         self.handler = handler or port
 
+    def __eq__(self, other):
+        return (isinstance(other, self.__class__)
+                and self.__dict__ == other.__dict__)
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
+
+    def __repr__(self):
+        return 'Job(port={:s}, item={:s}, send={:s}, origin={:s}, handler={:s})'.format(
+            self.port, self.item, self.send, self.origin, self.handler)
+
 JobEvent = namedtuple('JobEvent', ['scheduler', 'job', 'completed'])
 AttachEvent = namedtuple('AttachEvent', ['scheduler', 'reactor'])
 StartEvent = namedtuple('StartEvent', ['scheduler'])
