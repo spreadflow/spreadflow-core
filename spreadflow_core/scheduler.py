@@ -27,7 +27,8 @@ class Job(object):
 
     def __repr__(self):
         return 'Job(port={:s}, item={:s}, send={:s}, origin={:s}, handler={:s})'.format(
-            self.port, self.item, self.send, self.origin, self.handler)
+            str(self.port), str(self.item), str(self.send),
+            str(self.origin), str(self.handler))
 
 JobEvent = namedtuple('JobEvent', ['scheduler', 'job', 'completed'])
 AttachEvent = namedtuple('AttachEvent', ['scheduler', 'reactor'])

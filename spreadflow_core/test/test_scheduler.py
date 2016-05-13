@@ -172,7 +172,7 @@ class SchedulerTestCase(TestCase):
         self.scheduler.send('some item', port_out)
 
         expected_message = 'Job failed on {:s} while processing {:s}'.format(
-            port_in, 'some item')
+            str(port_in), 'some item')
 
         from testtools.twistedsupport._runtest import _NoTwistedLogObservers
         with _NoTwistedLogObservers():
