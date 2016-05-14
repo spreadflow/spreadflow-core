@@ -8,6 +8,8 @@ from bson import BSON
 from twisted.internet import defer, protocol
 from twisted.internet.endpoints import clientFromString
 
+class MessageParserMissingError(Exception):
+    pass
 
 class MessageParser(object):
 
@@ -44,15 +46,12 @@ class MessageParser(object):
 
 class SchedulerClientProtocol(protocol.Protocol):
     """A client protocol suitable to control a remote scheduler.
-
-    Attributes:
-        parser_class (Optional): The parser class used for decoding incomming
-            messages.
     """
-    parser_class = MessageParser
+
+    # pylint: disable=invalid-name
 
     def __init__(self):
-        self._parser = self.parser_class()
+        self._parser = None
         self._stopped = None
 
     def loseConnection(self):
@@ -71,10 +70,15 @@ class SchedulerClientProtocol(protocol.Protocol):
     def dataReceived(self, data):
         self._parser.push(data)
         for msg in self._parser.messages():
-            self.factory.dispatch(msg) # pylint: disable=no-member
+            self.factory.dispatch(msg['port'], msg['item']) # pylint: disable=no-member
 
-    def connectionLost(self, reason):
+    def connectionMade(self):
+        self._parser = self.factory.parser_factory() # pylint: disable=no-member
+        self._stopped = None
+
+    def connectionLost(self, reason=protocol.connectionDone):
         self.connected = 0
+        self._parser = None
         if self._stopped:
             self._stopped.callback(self)
             self._stopped = None
@@ -86,7 +90,8 @@ class SchedulerClientFactory(protocol.ClientFactory):
 
     protocol = SchedulerClientProtocol
 
-    def __init__(self, portmap, scheduler):
+    def __init__(self, portmap, scheduler, parser_factory):
+        self.parser_factory = parser_factory
         self.portmap = portmap
         self.scheduler = scheduler
 
@@ -97,6 +102,7 @@ class SchedulerClientFactory(protocol.ClientFactory):
 class SchedulerClient(object):
     endpoint = None
     factory_class = SchedulerClientFactory
+    parser_factory = None
     portmap = None
     reactor = None
     scheduler = None
@@ -108,7 +114,8 @@ class SchedulerClient(object):
 
     @defer.inlineCallbacks
     def start(self):
-        factory = self.factory_class(self.portmap, self.scheduler)
+        assert self.parser_factory is not None, "Subclass must specify a parser_factory"
+        factory = self.factory_class(self.portmap, self.scheduler, self.parser_factory)
         client = clientFromString(self.reactor, self.endpoint)
         self._protocol = yield client.connect(factory)
 
