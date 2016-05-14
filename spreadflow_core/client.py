@@ -90,10 +90,8 @@ class SchedulerClientFactory(protocol.ClientFactory):
         self.portmap = portmap
         self.scheduler = scheduler
 
-    def dispatch(self, item):
-        # FIXME: Do something sensible with portmap, send to the appropriate
-        # output port.
-        self.scheduler.send(item, self.portmap['default'])
+    def dispatch(self, port, item):
+        self.scheduler.send(item, self.portmap[port])
 
 
 class SchedulerClient(object):
