@@ -32,7 +32,6 @@ setup(
     install_requires=[
         'Twisted',
         'graphviz',
-        'pymongo',
         'toposort',
         'zope.interface'
     ],

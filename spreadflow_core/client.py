@@ -4,42 +4,8 @@ from __future__ import unicode_literals
 
 import struct
 
-from bson import BSON
 from twisted.internet import defer, protocol
 from twisted.internet.endpoints import clientFromString
-
-class MessageParser(object):
-
-    MAX_LENGTH = 32768
-
-
-    def __init__(self):
-        self._buffer = b''
-
-
-    def push(self, data):
-        if len(self._buffer) + len(data) > self.MAX_LENGTH:
-            raise RuntimeError('Buffer length exceeded')
-
-        self._buffer += data
-
-
-    def messages(self):
-        doc_start = 0
-
-        while doc_start + 4 < len(self._buffer):
-            # http://bsonspec.org/spec.html
-            (doc_len, ) = struct.unpack(b'<l', self._buffer[doc_start:doc_start + 4])
-            if (doc_start + doc_len > len(self._buffer)):
-                break
-
-            doc = BSON(self._buffer[doc_start:doc_start + doc_len])
-            yield doc.decode()
-
-            doc_start += doc_len
-
-        self._buffer = self._buffer[doc_start:]
-
 
 class SchedulerClientProtocol(protocol.Protocol):
     """A client protocol suitable to control a remote scheduler.
