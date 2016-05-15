@@ -26,12 +26,10 @@ setup(
     entry_points={
         'console_scripts': [
             'spreadflow-twistd = spreadflow_core.scripts.spreadflow_twistd:main',
-            'spreadflow-confviz = spreadflow_core.scripts.spreadflow_confviz:main'
         ]
     },
     install_requires=[
         'Twisted',
-        'graphviz',
         'toposort',
         'zope.interface'
     ],
