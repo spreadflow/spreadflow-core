@@ -8,9 +8,6 @@ from bson import BSON
 from twisted.internet import defer, protocol
 from twisted.internet.endpoints import clientFromString
 
-class MessageParserMissingError(Exception):
-    pass
-
 class MessageParser(object):
 
     MAX_LENGTH = 32768
