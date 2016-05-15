@@ -6,7 +6,7 @@ import os
 import tempfile
 
 from twisted.application import service
-from twisted.internet import task
+from twisted.internet import error, task
 from twisted.logger import globalLogPublisher, ILogObserver
 from twisted.python import usage
 from zope.interface import provider
@@ -68,7 +68,11 @@ class SpreadFlowService(service.Service):
 
     def _stop(self, result):
         from twisted.internet import reactor
-        reactor.stop()
+        try:
+            reactor.stop()
+        except error.ReactorNotRunning:
+            pass
+        return result
 
     def _oneshot_job_event_handler(self, event):
         scheduler = event.scheduler
