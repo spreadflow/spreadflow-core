@@ -19,6 +19,7 @@ class PickleMessageParser(object):
     """
 
     MAX_LENGTH = 32768
+    HEADER_MAGIC = b'I'[0]
 
     def __init__(self, buffer_max_len=MAX_LENGTH):
         self._buffer_max_len = buffer_max_len
@@ -51,7 +52,7 @@ class PickleMessageParser(object):
         frame_start = 0
 
         while self._buffer[frame_start:frame_start + self._header_max_len].find(b'.') > -1:
-            if self._buffer[frame_start] is not b'I':
+            if self._buffer[frame_start] is not self.HEADER_MAGIC:
                 raise RuntimeError('Frame header is a single integer')
 
             header = self._buffer[frame_start:frame_start + self._header_max_len]
