@@ -143,4 +143,4 @@ class JsonMessageBuilder(object):
     """
 
     def message(self, msg):
-        return json.dumps(msg).encode('utf-8')
+        return json.dumps(msg).encode('utf-8') + b'\n'
