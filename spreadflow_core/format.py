@@ -129,7 +129,7 @@ class JsonMessageParser(object):
             if frame_end > len(self._buffer):
                 break
 
-            yield json.loads(self._buffer[frame_start:frame_end])
+            yield json.loads(self._buffer[frame_start:frame_end].decode('utf-8'))
 
             frame_start += frame_len
 
@@ -141,4 +141,4 @@ class JsonMessageBuilder(object):
     """
 
     def message(self, msg):
-        return json.dumps(msg)
+        return json.dumps(msg).encode('utf-8')
