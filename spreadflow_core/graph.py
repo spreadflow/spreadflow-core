@@ -6,15 +6,13 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import unicode_literals
 
-from collections import defaultdict
-
 def contract(g, f):
     """
     Returns a directed graph with all vertices from the input graph for which
     f() returns True while maintaining reachability.
     """
     vertices = [v for v in g.keys() if f(v)]
-    result = defaultdict(set, ((v, set()) for v in vertices))
+    result = {v: set() for v in vertices}
     visited = set()
 
     stack = list(zip(vertices, vertices))
@@ -25,7 +23,7 @@ def contract(g, f):
             v, base = pair
             for w in g.get(v, set()):
                 if f(w):
-                    result[base].add(w)
+                    result.setdefault(base, set()).add(w)
                 else:
                     stack.append((w, base))
 
@@ -37,9 +35,9 @@ def vertices(g, f=lambda v: True):
     return result
 
 def reverse(g):
-    result = defaultdict(set)
+    result = {}
     for v, arcs in g.items():
         for w in arcs:
-            result[w].add(v)
+            result.setdefault(w, set()).add(v)
 
     return result
