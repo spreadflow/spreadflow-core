@@ -6,6 +6,19 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import unicode_literals
 
+def digraph(iterator):
+    """
+    Returns a directed graph built from the specified edge list.
+    """
+    result = {}
+
+    for v, w in iterator:
+        result.setdefault(v, set())
+        if w is not None:
+            result[v].add(w)
+
+    return result
+
 def contract(g, f):
     """
     Returns a directed graph with all vertices from the input graph for which

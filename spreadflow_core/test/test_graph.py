@@ -9,6 +9,39 @@ from spreadflow_core import graph
 
 class GraphTestCase(unittest.TestCase):
 
+    def test_digraph(self):
+        """
+        Test digraph construction
+        """
+
+        edgelist = []
+        expected_graph = {}
+        result = graph.digraph(edgelist)
+        self.assertEqual(expected_graph, result)
+
+        edgelist = [
+            ('A', 'B'),
+        ]
+        expected_graph = {
+            'A': {'B'},
+        }
+        result = graph.digraph(edgelist)
+        self.assertEqual(expected_graph, result)
+
+        edgelist = [
+            ('A', 'B'),
+            ('A', 'C'),
+            ('B', 'C'),
+            ('D', None),
+        ]
+        expected_graph = {
+            'A': {'B', 'C'},
+            'B': {'C'},
+            'D': set(),
+        }
+        result = graph.digraph(edgelist)
+        self.assertEqual(expected_graph, result)
+
     def test_contract_identity(self):
         """
         Test that returned graph is identical to input graph if the callback
