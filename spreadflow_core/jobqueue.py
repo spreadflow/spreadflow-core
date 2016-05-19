@@ -16,6 +16,9 @@ from twisted.internet import defer
 class QueueNoneReady(Exception):
     pass
 
+Job = collections.namedtuple("Job", ["channel", "func", "args", "kwds"])
+Entry = collections.namedtuple("Entry", ["deferred", "job"])
+
 class JobQueue(collections.Iterator):
     """Cooperative job queue.
 
@@ -101,9 +104,12 @@ class JobQueue(collections.Iterator):
             :class:`twisted.internet.defer.Deferred`: A deferred firing when the
             job completed.
         """
-        completed = defer.Deferred()
-        self._backlog.append((channel, func, args, kwds, completed))
+        job = Job(channel, func, args, kwds)
+        completed = defer.Deferred(lambda dfr: self._job_cancel(Entry(dfr, job)))
+
+        self._backlog.append(Entry(completed, job))
         self._wake()
+
         return completed
 
     def get(self):
@@ -118,8 +124,9 @@ class JobQueue(collections.Iterator):
             spreadflow_core.jobqueue.QueueNoneReady: Raised if there is either
                 no item ready or no channel.
         """
-        for idx, item in enumerate(self._backlog):
-            if item[0] not in self._jobs:
+        active_channels = set([job.channel for _, job in self._jobs.values()])
+        for idx, (_, job) in enumerate(self._backlog):
+            if job.channel not in active_channels:
                 return self._backlog.pop(idx)
 
         raise QueueNoneReady()
@@ -151,16 +158,16 @@ class JobQueue(collections.Iterator):
             raise StopIteration()
 
         try:
-            channel, func, args, kwds, completed = self.get()
+            completed, job = self.get()
         except QueueNoneReady:
             if not self._wakeup:
                 self._wakeup = defer.Deferred()
         else:
-            defered = defer.maybeDeferred(func, *args, **kwds)
+            defered = defer.maybeDeferred(job.func, *job.args, **job.kwds)
 
             defered.pause()
-            self._jobs[channel] = completed
-            defered.addBoth(self._job_callback, channel)
+            self._jobs[completed] = Entry(defered, job)
+            defered.addBoth(self._job_callback, completed)
             defered.chainDeferred(completed)
             defered.unpause()
 
@@ -181,10 +188,28 @@ class JobQueue(collections.Iterator):
             self._wakeup.callback(self)
             self._wakeup = None
 
-    def _job_callback(self, result, channel):
+    def _job_callback(self, result, completed):
         """
         Free up the channel after a job has completed.
         """
-        self._jobs.pop(channel)
+        self._jobs.pop(completed)
         self._wake()
         return result
+
+    def _job_cancel(self, entry):
+        try:
+            subtask, _ = self._jobs[entry.deferred]
+        except KeyError:
+            pass
+        else:
+            subtask.cancel()
+            return
+
+        try:
+            self._backlog.remove(entry)
+        except ValueError:
+            pass
+        else:
+            return
+
+        assert 0, "Failed to cancel a job which is neither in backlog nor in jobs"

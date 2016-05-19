@@ -8,7 +8,7 @@ from __future__ import unicode_literals
 import sys
 
 from twisted.internet import defer
-import unittest
+from twisted.trial import unittest
 
 from spreadflow_core.jobqueue import JobQueue
 
@@ -104,3 +104,45 @@ class JobQueueTestCase(unittest.TestCase):
 
         queue_ready = _next(queue)
         self.assertIsInstance(queue_ready, defer.Deferred)
+
+    def test_cancel_job_early(self):
+        """
+        A job which is cancelled while it waits in the backlog does not execute
+        at a later stage.
+        """
+        def job():
+            self.fail("Must not be executed after cancellation")
+
+        channel = object()
+        queue = JobQueue()
+
+        outer = queue.put(channel, job)
+
+        outer.addErrback(lambda failure: failure.trap(defer.CancelledError))
+        outer.cancel()
+
+        queue_ready = _next(queue)
+        self.assertIsInstance(queue_ready, defer.Deferred)
+
+        self.assertTrue(outer.called)
+
+
+    def test_propagates_cancel_to_job(self):
+        """
+        Cancellation is propagated to the inner deferred if a job is being
+        executed.
+        """
+        channel = object()
+        queue = JobQueue()
+
+        inner = defer.Deferred()
+
+        outer = queue.put(channel, lambda: inner)
+        queue_ready = _next(queue)
+        self.assertIsNone(queue_ready)
+
+        outer.addErrback(lambda failure: failure.trap(defer.CancelledError))
+        outer.cancel()
+
+        self.assertTrue(outer.called)
+        self.assertTrue(inner.called)
