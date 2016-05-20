@@ -7,7 +7,7 @@ import copy
 from twisted.internet import defer, task
 from twisted.logger import Logger, LogLevel
 
-from spreadflow_core.flow import ComponentBase, PortCollection, ComponentCollection
+from spreadflow_core.flow import ComponentBase, PortCollection
 
 
 class SyntheticSource(object):
@@ -41,7 +41,7 @@ class DebugLog(object):
         send(item, self)
 
 
-class Compound(PortCollection, ComponentCollection):
+class Compound(PortCollection):
     """
     A process wrapping other processes.
     """
@@ -69,10 +69,6 @@ class Compound(PortCollection, ComponentCollection):
             else:
                 ports.append(member)
         return ports
-
-    @property
-    def children(self):
-        return list(self._children)
 
 
 class Duplicator(ComponentBase):

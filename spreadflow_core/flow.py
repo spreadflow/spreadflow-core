@@ -30,18 +30,6 @@ class PortCollection(object):
         """
         return []
 
-class ComponentCollection(object):
-    """
-    Base class for components wrapping other components.
-    """
-
-    @property
-    def children(self):
-        """
-        Return a list of subcomponents.
-        """
-        return []
-
 class ComponentBase(PortCollection):
     """
     A process with separate/multiple input and output ports.
