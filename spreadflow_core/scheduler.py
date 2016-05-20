@@ -153,7 +153,7 @@ class Scheduler(object):
         for deferred_job, (_, job) in self._pending.items():
             deferred_job.addErrback(_trapcancel)
             deferred_job.addErrback(self._logfail, 'Failed to cancel job', job=job)
-        for deferred_job in self._pending.keys():
+        for deferred_job in list(self._pending.keys()):
             deferred_job.cancel()
 
         self.log.debug('Stopping queue')
