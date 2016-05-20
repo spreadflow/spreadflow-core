@@ -2,7 +2,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import unicode_literals
 
-from collections import defaultdict
+from collections import defaultdict, Counter
 
 from spreadflow_core import scheduler
 from spreadflow_core.component import PortCollection
@@ -26,40 +26,21 @@ class Flowmap(object):
     def compile(self):
         # Build port connections.
         if self._compiled_connections is None:
-            self._compiled_connections = {}
+            connections = list(self._resolve_port_aliases())
 
-            for port_out, port_in in self.connections:
-                while True:
-                    if isinstance(port_out, StringType):
-                        port_out = self.aliasmap[port_out]
-                    elif isinstance(port_out, PortCollection):
-                        self.annotations.setdefault(port_out, {})
-                        if port_out is not port_out.outs[-1]:
-                            port_out = port_out.outs[-1]
-                        else:
-                            break
-                    else:
-                        break
+            if len(connections):
+                outs, ins = zip(*connections)
 
-                while True:
-                    if isinstance(port_in, StringType):
-                        port_in = self.aliasmap[port_in]
-                    elif isinstance(port_in, PortCollection):
-                        self.annotations.setdefault(port_in, {})
-                        if port_in is not port_in.ins[0]:
-                            port_in = port_in.ins[0]
-                        else:
-                            break
-                    else:
-                        break
+                non_callable_ins = [port for port in ins if not callable(port)]
+                if len(non_callable_ins):
+                    raise RuntimeError('Attempting to use a port as input which is not callable')
 
-                if not callable(port_in):
-                    raise RuntimeError('Attempting to use an port as input which is not callable')
+                out_counts = Counter(outs).items()
+                multi_outs = [port for port, count in out_counts if count > 1]
+                if len(multi_outs):
+                    raise RuntimeError('Attempting to connect more than one input port to a single output port')
 
-                if port_out in self._compiled_connections:
-                    raise RuntimeError('Attempting to connect more than one input port to an output port')
-
-                self._compiled_connections[port_out] = port_in
+            self._compiled_connections = dict(connections)
 
         if self._eventhandlers is None:
             self._eventhandlers = []
@@ -89,6 +70,34 @@ class Flowmap(object):
                 self._eventhandlers.append(entry)
 
         return self._compiled_connections.items()
+
+    def _resolve_port_aliases(self):
+        for port_out, port_in in self.connections:
+            while True:
+                if isinstance(port_out, StringType):
+                    port_out = self.aliasmap[port_out]
+                elif isinstance(port_out, PortCollection):
+                    self.annotations.setdefault(port_out, {})
+                    if port_out is not port_out.outs[-1]:
+                        port_out = port_out.outs[-1]
+                    else:
+                        break
+                else:
+                    break
+
+            while True:
+                if isinstance(port_in, StringType):
+                    port_in = self.aliasmap[port_in]
+                elif isinstance(port_in, PortCollection):
+                    self.annotations.setdefault(port_in, {})
+                    if port_in is not port_in.ins[0]:
+                        port_in = port_in.ins[0]
+                    else:
+                        break
+                else:
+                    break
+
+            yield port_out, port_in
 
     def register_event_handlers(self, eventdispatcher):
         self.compile()
