@@ -116,8 +116,6 @@ class ClientEndpointMixin(object):
 
     peer = None
     strport = None
-    _endpoint = None
-    _factory = None
 
     def get_client_protocol_factory(self, scheduler, reactor):
         """
@@ -127,20 +125,14 @@ class ClientEndpointMixin(object):
         """
         raise NotImplementedError('Subclass must implement this method')
 
+    @defer.inlineCallbacks
     def attach(self, scheduler, reactor):
-        self._factory = self.get_client_protocol_factory(scheduler, reactor)
-        self._endpoint = clientFromString(reactor, self.strport)
+        factory = self.get_client_protocol_factory(scheduler, reactor)
+        endpoint = clientFromString(reactor, self.strport)
+        self.peer = yield endpoint.connect(factory)
 
     @defer.inlineCallbacks
-    def start(self):
-        self.peer = yield self._endpoint.connect(self._factory)
-
-    @defer.inlineCallbacks
-    def join(self):
+    def detach(self):
         if self.peer:
             yield self.peer.loseConnection()
         self.peer = None
-
-    def detach(self):
-        self._factory = None
-        self._endpoint = None

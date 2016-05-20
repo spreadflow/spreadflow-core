@@ -34,8 +34,6 @@ Entry = namedtuple('Entry', ['deferred', 'job'])
 
 JobEvent = namedtuple('JobEvent', ['scheduler', 'job', 'completed'])
 AttachEvent = namedtuple('AttachEvent', ['scheduler', 'reactor'])
-StartEvent = namedtuple('StartEvent', ['scheduler'])
-JoinEvent = namedtuple('JoinEvent', ['scheduler'])
 DetachEvent = namedtuple('DetachEvent', ['scheduler'])
 
 class Scheduler(object):
@@ -112,10 +110,6 @@ class Scheduler(object):
         yield self.eventdispatcher.dispatch(AttachEvent(scheduler=self, reactor=reactor))
         self.log.debug('Attached sources and services')
 
-        self.log.debug('Starting sources and services')
-        yield self.eventdispatcher.dispatch(StartEvent(scheduler=self))
-        self.log.debug('Started sources and services')
-
         self.log.debug('Starting queue')
         self._queue_task = self.cooperate(self._queue)
         self._queue_done = self._queue_task.whenDone()
@@ -144,11 +138,6 @@ class Scheduler(object):
         # Prevent that any queued items are run.
         self._stopped = True
         self._queue_task.pause()
-
-        self.log.debug('Joining sources and services')
-        event = JoinEvent(scheduler=self)
-        yield self.eventdispatcher.dispatch(event, fail_mode=FailMode.RETURN).addCallback(self.eventdispatcher.log_failures, event)
-        self.log.debug('Joined sources and services')
 
         self.log.debug('Detaching sources and services')
         event = DetachEvent(scheduler=self)

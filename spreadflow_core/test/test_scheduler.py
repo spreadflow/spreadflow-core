@@ -11,7 +11,7 @@ from unittest import TestCase
 from twisted.internet import defer, task
 
 from spreadflow_core.eventdispatcher import EventDispatcher
-from spreadflow_core.scheduler import Scheduler, Job, JobEvent, AttachEvent, StartEvent, JoinEvent, DetachEvent
+from spreadflow_core.scheduler import Scheduler, Job, JobEvent, AttachEvent, DetachEvent
 from spreadflow_core.test.matchers import MatchesInvocation
 
 defer.setDebugging(True)
@@ -64,8 +64,6 @@ class SchedulerTestCase(TestCase):
 
         self.dispatcher.add_listener(JobEvent, 0, job_handler)
         self.dispatcher.add_listener(AttachEvent, 0, attach_handler)
-        self.dispatcher.add_listener(StartEvent, 0, start_handler)
-        self.dispatcher.add_listener(JoinEvent, 0, join_handler)
         self.dispatcher.add_listener(DetachEvent, 0, detach_handler)
 
         # Start the scheduler.
@@ -74,7 +72,6 @@ class SchedulerTestCase(TestCase):
 
         self.assertEquals(job_handler.call_count, 0)
         attach_handler.assert_called_once_with(AttachEvent(scheduler=self.scheduler, reactor=self.clock))
-        start_handler.assert_called_once_with(StartEvent(scheduler=self.scheduler))
         self.assertEquals(join_handler.call_count, 0)
         self.assertEquals(detach_handler.call_count, 0)
 
@@ -124,7 +121,6 @@ class SchedulerTestCase(TestCase):
         self.assertEquals(job_handler.call_count, 0)
         self.assertEquals(attach_handler.call_count, 0)
         self.assertEquals(start_handler.call_count, 0)
-        join_handler.assert_called_once_with(JoinEvent(scheduler=self.scheduler))
         detach_handler.assert_called_once_with(DetachEvent(scheduler=self.scheduler))
 
     def test_run_job(self):
