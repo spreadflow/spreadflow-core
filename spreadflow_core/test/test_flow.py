@@ -11,7 +11,8 @@ from __future__ import unicode_literals
 
 import unittest
 
-from spreadflow_core.flow import Flowmap, PortCollection
+from spreadflow_core.flow import Flowmap
+from spreadflow_core.component import PortCollection
 
 class _StaticPortCollection(PortCollection):
     """

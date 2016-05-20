@@ -5,43 +5,12 @@ from __future__ import unicode_literals
 from collections import defaultdict
 
 from spreadflow_core import scheduler
+from spreadflow_core.component import PortCollection
 
 try:
   StringType = basestring # pylint: disable=undefined-variable
 except NameError:
   StringType = str
-
-class PortCollection(object):
-    """
-    Base class for components with separate/multiple input/output ports.
-    """
-
-    @property
-    def ins(self):
-        """
-        Return a list of input ports. Default port must be first.
-        """
-        return []
-
-    @property
-    def outs(self):
-        """
-        Return a list of output ports. Default port must be last.
-        """
-        return []
-
-class ComponentBase(PortCollection):
-    """
-    A process with separate/multiple input and output ports.
-    """
-
-    @property
-    def ins(self):
-        return [self]
-
-    @property
-    def outs(self):
-        return [self]
 
 class Flowmap(object):
     def __init__(self):
