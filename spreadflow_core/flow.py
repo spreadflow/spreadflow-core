@@ -85,18 +85,18 @@ class Flowmap(object):
                         break
 
                 if not callable(port_in):
-                    RuntimeError('Attempting to use an port as input which is not callable')
+                    raise RuntimeError('Attempting to use an port as input which is not callable')
 
                 if port_out in self._compiled_connections:
-                    RuntimeError('Attempting to connect more than one input port to an output port')
+                    raise RuntimeError('Attempting to connect more than one input port to an output port')
 
                 self._compiled_connections[port_out] = port_in
 
         if self._eventhandlers is None:
             self._eventhandlers = []
 
-            ports = set(self._compiled_connections.keys()
-                        + self._compiled_connections.values())
+            ports = set(list(self._compiled_connections.keys())
+                        + list(self._compiled_connections.values()))
 
             # Build attach event handlers.
             is_attachable = lambda port: \
