@@ -7,6 +7,7 @@ from __future__ import division
 from __future__ import unicode_literals
 
 import pickle
+import pickletools
 import json
 
 class PickleMessageParser(object):
@@ -52,9 +53,10 @@ class PickleMessageParser(object):
 
         while self._buffer.find(b'.', frame_start, frame_start + self.HEADER_MAX_LEN) > -1:
             header = self._buffer[frame_start:frame_start + self.HEADER_MAX_LEN]
-            header_len = header.index(b'.') + 1
+            header_len = list(pickletools.genops(header))[-1][2]+1
 
             doc_len = pickle.loads(header[:header_len])
+
             if not isinstance(doc_len, int) or doc_len < 0:
                 raise ValueError('Document length must be a positive integer')
 
