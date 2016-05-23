@@ -12,6 +12,7 @@ install:
 script:
   - pylint --errors-only spreadflow_core
   - pyflakes spreadflow_core
-  - coverage run `which trial` spreadflow_core
+  - COVERAGE_PROCESS_START=`pwd`/.coveragerc trial spreadflow_core
+  - coverage combine `pwd` `pwd`/_trial_temp
 after_success:
   - coveralls
