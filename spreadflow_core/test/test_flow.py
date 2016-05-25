@@ -12,9 +12,9 @@ from __future__ import unicode_literals
 import unittest
 
 from spreadflow_core.flow import Flowmap
-from spreadflow_core.component import PortCollection
+from spreadflow_core.component import ComponentBase
 
-class _StaticPortCollection(PortCollection):
+class _StaticComponent(ComponentBase):
     """
     Static test-only port collection.
     """
@@ -101,11 +101,11 @@ class FlowmapTestCase(unittest.TestCase):
 
         upstream_out_1 = object()
         upstream_out_2 = object()
-        upstream = _StaticPortCollection(outs=[upstream_out_1, upstream_out_2])
+        upstream = _StaticComponent(outs=[upstream_out_1, upstream_out_2])
 
         downstream_in_1 = lambda item: None
         downstream_in_2 = lambda item: None
-        downstream = _StaticPortCollection(ins=[downstream_in_1, downstream_in_2])
+        downstream = _StaticComponent(ins=[downstream_in_1, downstream_in_2])
 
         flowmap = Flowmap()
         flowmap.connections.append((upstream, downstream))
