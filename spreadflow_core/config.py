@@ -20,10 +20,7 @@ def config_eval(path):
     if COMPONENT_VISITORS.pop() != components.append or COMPONENT_VISITORS != saved_visitors:
         raise RuntimeError('COMPONENT_VISITORS changed during script evaluation')
 
-    # Collect registered components.
-    result.flowmap.components.extend(components)
-
     # Cleanup script environment.
     import sys
     sys.modules.pop('spreadflow_core.script')
-    return result.flowmap
+    return result.flowmap, components, result.annotations

@@ -44,14 +44,14 @@ class SpreadFlowService(service.Service):
         else:
             confpath = os.path.join(os.getcwd(), 'spreadflow.conf')
 
-        flowmap = config_eval(confpath)
+        flowmap, components, _ = config_eval(confpath)
 
         self._eventdispatcher = EventDispatcher()
 
         if self.options['oneshot']:
             self._eventdispatcher.add_listener(JobEvent, 0, self._oneshot_job_event_handler)
 
-        flowmap.register_event_handlers(self._eventdispatcher)
+        flowmap.register_event_handlers(self._eventdispatcher, components)
 
         self._scheduler = Scheduler(dict(flowmap.compile()), self._eventdispatcher)
 
