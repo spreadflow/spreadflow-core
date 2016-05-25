@@ -7,7 +7,7 @@ import copy
 from twisted.internet import defer, task
 from twisted.logger import Logger, LogLevel
 
-from spreadflow_core.component import ComponentBase, PortCollection
+from spreadflow_core.component import ComponentBase, PortCollection, RegisteredComponent
 
 
 class SyntheticSource(object):
@@ -41,6 +41,7 @@ class DebugLog(object):
         send(item, self)
 
 
+@RegisteredComponent()
 class Compound(PortCollection):
     """
     A process wrapping other processes.

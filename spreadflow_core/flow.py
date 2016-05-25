@@ -15,9 +15,10 @@ except NameError:
 class Flowmap(object):
     def __init__(self):
         super(Flowmap, self).__init__()
-        self.annotations = defaultdict(dict)
-        self.connections = []
         self.aliasmap = {}
+        self.annotations = defaultdict(dict)
+        self.components = []
+        self.connections = []
 
         self._compiled_connections = None
         self._eventhandlers = None
@@ -77,7 +78,6 @@ class Flowmap(object):
                 if isinstance(port_out, StringType):
                     port_out = self.aliasmap[port_out]
                 elif isinstance(port_out, PortCollection):
-                    self.annotations.setdefault(port_out, {})
                     if port_out is not port_out.outs[-1]:
                         port_out = port_out.outs[-1]
                     else:
@@ -89,7 +89,6 @@ class Flowmap(object):
                 if isinstance(port_in, StringType):
                     port_in = self.aliasmap[port_in]
                 elif isinstance(port_in, PortCollection):
-                    self.annotations.setdefault(port_in, {})
                     if port_in is not port_in.ins[0]:
                         port_in = port_in.ins[0]
                     else:
