@@ -2,15 +2,15 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import unicode_literals
 
-from collections import defaultdict, Counter
+from collections import  Counter
 
 from spreadflow_core import scheduler
 from spreadflow_core.component import PortCollection
 
 try:
-  StringType = basestring # pylint: disable=undefined-variable
+    StringType = basestring # pylint: disable=undefined-variable
 except NameError:
-  StringType = str
+    StringType = str
 
 class Flowmap(object):
     def __init__(self):
@@ -19,8 +19,6 @@ class Flowmap(object):
         self.connections = []
 
         self._compiled_connections = None
-        self._eventhandlers = None
-        self._eventhandlerkeys = []
 
     def compile(self):
         # Build port connections.
@@ -73,38 +71,37 @@ class Flowmap(object):
             if len(multi_outs):
                 raise RuntimeError('Attempting to connect more than one input port to a single output port')
 
-    def register_event_handlers(self, eventdispatcher, components):
-        if self._eventhandlers is None:
-            self._eventhandlers = []
+    @staticmethod
+    def register_event_handlers(eventdispatcher, connections, components):
+        result = []
+        entries = []
 
-            links = self.compile()
-            outs, ins = zip(*links)
+        outs, ins = zip(*connections)
+        comps = set(list(outs) + list(ins) + list(components))
 
-            comps = set(list(outs) + list(ins) + list(components))
+        # Build attach event handlers.
+        is_attachable = lambda comp: \
+                hasattr(comp, 'attach') and callable(comp.attach)
+        attachable_comps = (comp for comp in comps if is_attachable(comp))
+        for comp in attachable_comps:
+            callback = lambda event, comp=comp: \
+                    comp.attach(event.scheduler, event.reactor)
+            entries.append((scheduler.AttachEvent, 0, callback))
 
-            # Build attach event handlers.
-            is_attachable = lambda comp: \
-                    hasattr(comp, 'attach') and callable(comp.attach)
-            attachable_comps = (comp for comp in comps if is_attachable(comp))
-            for comp in attachable_comps:
-                callback = lambda event, comp=comp: \
-                        comp.attach(event.scheduler, event.reactor)
-                entry = (scheduler.AttachEvent, 0, callback)
-                self._eventhandlers.append(entry)
+        # Build detach event handlers.
+        is_detachable = lambda comp: \
+                hasattr(comp, 'detach') and callable(comp.detach)
+        detachable_comps = (comp for comp in comps if is_detachable(comp))
+        for comp in detachable_comps:
+            callback = lambda event, comp=comp: comp.detach()
+            entries.append((scheduler.DetachEvent, 0, callback))
 
-            # Build detach event handlers.
-            is_detachable = lambda comp: \
-                    hasattr(comp, 'detach') and callable(comp.detach)
-            detachable_comps = (comp for comp in comps if is_detachable(comp))
-            for comp in detachable_comps:
-                callback = lambda event, comp=comp: comp.detach()
-                entry = (scheduler.DetachEvent, 0, callback)
-                self._eventhandlers.append(entry)
-
-        for event_type, priority, callback in self._eventhandlers:
+        for event_type, priority, callback in entries:
             key = eventdispatcher.add_listener(event_type, priority, callback)
-            self._eventhandlerkeys.append((event_type, key))
+            result.append((event_type, key))
 
-    def unregister_event_handlers(self, eventdispatcher):
-        for event_type, key in self._eventhandlerkeys:
+        return result
+
+    def unregister_event_handlers(self, eventdispatcher, eventhandlerkeys):
+        for event_type, key in eventhandlerkeys:
             eventdispatcher.remove_listener(event_type, key)
