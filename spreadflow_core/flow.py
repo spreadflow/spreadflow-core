@@ -26,19 +26,7 @@ class Flowmap(object):
         # Build port connections.
         if self._compiled_connections is None:
             connections = list(self._resolve_port_aliases())
-
-            if len(connections):
-                outs, ins = zip(*connections)
-
-                non_callable_ins = [port for port in ins if not callable(port)]
-                if len(non_callable_ins):
-                    raise RuntimeError('Attempting to use a port as input which is not callable')
-
-                out_counts = Counter(outs).items()
-                multi_outs = [port for port, count in out_counts if count > 1]
-                if len(multi_outs):
-                    raise RuntimeError('Attempting to connect more than one input port to a single output port')
-
+            self._validate_links(connections)
             self._compiled_connections = connections
 
         return iter(self._compiled_connections)
@@ -68,6 +56,19 @@ class Flowmap(object):
                     break
 
             yield port_out, port_in
+
+    def _validate_links(self, connections):
+        if len(connections):
+            outs, ins = zip(*connections)
+
+            non_callable_ins = [port for port in ins if not callable(port)]
+            if len(non_callable_ins):
+                raise RuntimeError('Attempting to use a port as input which is not callable')
+
+            out_counts = Counter(outs).items()
+            multi_outs = [port for port, count in out_counts if count > 1]
+            if len(multi_outs):
+                raise RuntimeError('Attempting to connect more than one input port to a single output port')
 
     def register_event_handlers(self, eventdispatcher, components):
         if self._eventhandlers is None:
