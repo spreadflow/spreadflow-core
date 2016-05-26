@@ -25,17 +25,19 @@ class Flowmap(object):
     def compile(self):
         # Build port connections.
         if self._compiled_connections is None:
-            connections = list(self._resolve_port_aliases())
+            connections = list(self._resolve_port_aliases(self.connections,
+                                                          self.aliasmap))
             self._validate_links(connections)
             self._compiled_connections = connections
 
         return iter(self._compiled_connections)
 
-    def _resolve_port_aliases(self):
-        for port_out, port_in in self.connections:
+    @staticmethod
+    def _resolve_port_aliases(links, aliasmap):
+        for port_out, port_in in links:
             while True:
                 if isinstance(port_out, StringType):
-                    port_out = self.aliasmap[port_out]
+                    port_out = aliasmap[port_out]
                 elif isinstance(port_out, PortCollection):
                     if port_out is not port_out.outs[-1]:
                         port_out = port_out.outs[-1]
@@ -46,7 +48,7 @@ class Flowmap(object):
 
             while True:
                 if isinstance(port_in, StringType):
-                    port_in = self.aliasmap[port_in]
+                    port_in = aliasmap[port_in]
                 elif isinstance(port_in, PortCollection):
                     if port_in is not port_in.ins[0]:
                         port_in = port_in.ins[0]
@@ -57,7 +59,8 @@ class Flowmap(object):
 
             yield port_out, port_in
 
-    def _validate_links(self, connections):
+    @staticmethod
+    def _validate_links(connections):
         if len(connections):
             outs, ins = zip(*connections)
 

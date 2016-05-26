@@ -51,9 +51,10 @@ class SpreadFlowService(service.Service):
         if self.options['oneshot']:
             self._eventdispatcher.add_listener(JobEvent, 0, self._oneshot_job_event_handler)
 
+        connections = flowmap.compile()
         flowmap.register_event_handlers(self._eventdispatcher, components)
 
-        self._scheduler = Scheduler(dict(flowmap.compile()), self._eventdispatcher)
+        self._scheduler = Scheduler(dict(connections), self._eventdispatcher)
 
         if self.options['queuestatus']:
             statuslog = SpreadFlowQueuestatusLogger(self.options['queuestatus'])
