@@ -2,15 +2,24 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import unicode_literals
 
-from collections import  Counter
+import itertools
+from collections import  Counter, defaultdict, namedtuple
 
 from spreadflow_core import scheduler
-from spreadflow_core.component import PortCollection
+from spreadflow_core.component import Compound, PortCollection
+from spreadflow_core.subprocess import SubprocessWorker, SubprocessController
 
 try:
     StringType = basestring # pylint: disable=undefined-variable
 except NameError:
     StringType = str
+
+PartitionBounds = namedtuple('PartitionBounds', ['outs', 'ins'])
+
+class Partition(Compound):
+    def __init__(self, children, bounds):
+        super(Partition, self).__init__(children)
+        self.bounds = bounds
 
 class Flowmap(object):
     def __init__(self):
@@ -18,17 +27,12 @@ class Flowmap(object):
         self.aliasmap = {}
         self.connections = []
 
-        self._compiled_connections = None
-
     def compile(self):
         # Build port connections.
-        if self._compiled_connections is None:
-            connections = list(self._resolve_port_aliases(self.connections,
-                                                          self.aliasmap))
-            self._validate_links(connections)
-            self._compiled_connections = connections
-
-        return iter(self._compiled_connections)
+        connections = list(self._resolve_port_aliases(self.connections,
+                                                      self.aliasmap))
+        self._validate_links(connections)
+        return connections
 
     @staticmethod
     def _resolve_port_aliases(links, aliasmap):
@@ -70,6 +74,140 @@ class Flowmap(object):
             multi_outs = [port for port, count in out_counts if count > 1]
             if len(multi_outs):
                 raise RuntimeError('Attempting to connect more than one input port to a single output port')
+
+
+    @staticmethod
+    def generate_partitions(connections, components, annotations):
+        """
+        Generate a map port -> partition name.
+        """
+
+        # Generate a map port -> partition name
+        # and also a map partition name -> set of components
+        port_partition = set()
+        for port in itertools.chain(*zip(*connections)):
+            try:
+                port_partition.add((port, annotations[port]['partition']))
+            except KeyError:
+                continue
+
+        partition_children = defaultdict(set)
+        for comp in components:
+            try:
+                partition_name = annotations[comp]['partition']
+            except KeyError:
+                continue
+
+            partition_children[partition_name].add(comp)
+
+            for port in itertools.chain(comp.ins, comp.outs):
+                port_partition.add((port, partition_name))
+
+        ports, part_names = zip(*port_partition)
+        port_counts = Counter(ports).items()
+        multi_parts = [port for port, count in port_counts if count > 1]
+        if len(multi_parts):
+            raise RuntimeError('Attempting to assign a port to multiple partitions')
+
+        port_partition_map = dict(port_partition)
+
+        # Collect all ports connected accross partition boundaries.
+        partition_bounds = {name: PartitionBounds([], []) for name in set(part_names)}
+        for port_out, port_in in connections:
+            partition_out = port_partition_map.get(port_out, None)
+            partition_in = port_partition_map.get(port_in, None)
+            if partition_out != partition_in:
+                if partition_out:
+                    partition_bounds[partition_out].outs.append(port_out)
+                if partition_in:
+                    bounds_ins = partition_bounds[partition_in].ins
+                    if port_in not in bounds_ins:
+                        bounds_ins.append(port_in)
+
+        # Collect all direct children of every partition.
+        partition_component_ports = set()
+        for partition_name, comps in partition_children.items():
+            for comp in comps:
+                partition_component_ports.update(comp.outs)
+                partition_component_ports.update(comp.ins)
+
+        for port in itertools.chain(*zip(*connections)):
+            if port not in partition_component_ports and port in port_partition_map:
+                partition_children[port_partition_map[port]].add(port)
+
+        # Finally generate a map partition name -> partition
+        partitions = {}
+        for name in set(part_names):
+            partitions[name] = Partition(partition_children[name],
+                                         partition_bounds[name])
+
+        return partitions
+
+
+    @staticmethod
+    def replace_partition_with_worker(partition, connections, components):
+        innames = list(range(len(partition.bounds.outs)))
+        outnames = list(range(len(partition.bounds.ins)))
+        worker = SubprocessWorker(innames=innames, outnames=outnames)
+
+        # Purge/rewire connections.
+        mapped_connections = []
+        outmap = dict(zip(partition.bounds.outs, worker.ins))
+        inmap = dict(zip(partition.bounds.ins, worker.outs))
+
+        for port_out, port_in in connections:
+            if port_out in partition and port_in in partition:
+                mapped_connections.append((port_out, port_in))
+            elif port_out in partition:
+                mapped_connections.append((port_out, outmap[port_out]))
+            elif port_in in partition:
+                mapped_connections.append((inmap[port_in], port_in))
+
+        # Purge/replace components.
+        mapped_components = [worker]
+        for comp in components:
+            any_port = set(list(comp.outs)[:1] + list(comp.ins)[:1]).pop()
+            if any_port in partition:
+                mapped_components.append(comp)
+
+        return mapped_connections, mapped_components
+
+
+    @staticmethod
+    def replace_partitions_with_controllers(partitions, connections, components):
+        outmap = dict()
+        inmap = dict()
+        inner_ports = set()
+
+        mapped_components = []
+
+        for name, partition in partitions.items():
+            innames = list(range(len(partition.bounds.ins)))
+            outnames = list(range(len(partition.bounds.outs)))
+            controller = SubprocessController(name, innames=innames, outnames=outnames)
+
+            mapped_components.append(controller)
+
+            outmap.update(zip(partition.bounds.outs, controller.outs))
+            inmap.update(zip(partition.bounds.ins, controller.ins))
+            inner_ports.update(set(partition.outs + partition.ins))
+
+        # Purge/rewire connections.
+        mapped_connections = []
+        for port_out, port_in in connections:
+            if port_out not in inner_ports or port_in not in inner_ports:
+                port_out = outmap.get(port_out, port_out)
+                port_in = inmap.get(port_in, port_in)
+                mapped_connections.append((port_out, port_in))
+
+        # Purge/replace components.
+        for comp in components:
+            any_port = set(list(comp.outs)[:1] + list(comp.ins)[:1]).pop()
+            if any_port not in inner_ports:
+                mapped_components.append(comp)
+
+        return mapped_connections, mapped_components
+
 
     @staticmethod
     def register_event_handlers(eventdispatcher, connections, components):

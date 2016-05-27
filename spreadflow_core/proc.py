@@ -41,37 +41,6 @@ class DebugLog(object):
         send(item, self)
 
 
-@RegisteredComponent()
-class Compound(PortCollection):
-    """
-    A process wrapping other processes.
-    """
-
-    def __init__(self, children):
-        assert len(children) == len(set(children)), 'Members must be unique'
-        self._children = children
-
-    @property
-    def ins(self):
-        ports = []
-        for member in self._children:
-            if isinstance(member, PortCollection):
-                ports.extend(member.ins)
-            else:
-                ports.append(member)
-        return ports
-
-    @property
-    def outs(self):
-        ports = []
-        for member in self._children:
-            if isinstance(member, PortCollection):
-                ports.extend(member.outs)
-            else:
-                ports.append(member)
-        return ports
-
-
 class Duplicator(ComponentBase):
     """
     A processor capable of sending messages to another flow.

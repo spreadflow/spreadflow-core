@@ -2,8 +2,9 @@
 Provides utility functions for spreadflow config script.
 """
 
+from spreadflow_core.component import Compound
 from spreadflow_core.flow import Flowmap
-from spreadflow_core.proc import Duplicator, Compound
+from spreadflow_core.proc import Duplicator
 
 annotations = {} # pylint: disable=C0103
 flowmap = Flowmap() # pylint: disable=C0103

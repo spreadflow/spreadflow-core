@@ -8,6 +8,8 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import unicode_literals
 
+import collections
+
 COMPONENT_VISITORS = []
 
 class RegisteredComponentFactory(object):
@@ -39,7 +41,7 @@ class RegisteredComponent(object):
         klass.__new__ = RegisteredComponentFactory(klass.__new__, self.visitors)
         return klass
 
-class PortCollection(object):
+class PortCollection(collections.Container):
     """
     Base class for components with separate/multiple input/output ports.
     """
@@ -49,14 +51,14 @@ class PortCollection(object):
         """
         Return a list of input ports. Default port must be first.
         """
-        return []
+        raise NotImplementedError()
 
     @property
     def outs(self):
         """
         Return a list of output ports. Default port must be last.
         """
-        return []
+        raise NotImplementedError()
 
 @RegisteredComponent()
 class ComponentBase(PortCollection):
@@ -71,3 +73,39 @@ class ComponentBase(PortCollection):
     @property
     def outs(self):
         return [self]
+
+    def __contains__(self, port):
+        return port in self.outs or port in self.ins
+
+@RegisteredComponent()
+class Compound(PortCollection):
+    """
+    A process wrapping other processes.
+    """
+
+    def __init__(self, children):
+        assert len(children) == len(set(children)), 'Members must be unique'
+        self._children = children
+
+    @property
+    def ins(self):
+        ports = []
+        for member in self._children:
+            if isinstance(member, PortCollection):
+                ports.extend(member.ins)
+            else:
+                ports.append(member)
+        return ports
+
+    @property
+    def outs(self):
+        ports = []
+        for member in self._children:
+            if isinstance(member, PortCollection):
+                ports.extend(member.outs)
+            else:
+                ports.append(member)
+        return ports
+
+    def __contains__(self, port):
+        return port in self.outs or port in self.ins
