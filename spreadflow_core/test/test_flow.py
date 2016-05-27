@@ -11,7 +11,7 @@ from __future__ import unicode_literals
 
 import unittest
 
-from spreadflow_core.flow import Flowmap
+from spreadflow_core.flow import Flowmap, FlowmapEmptyError, FlowmapPortError
 from spreadflow_core.component import ComponentBase
 
 class _StaticComponent(ComponentBase):
@@ -39,11 +39,10 @@ class FlowmapTestCase(unittest.TestCase):
 
     def test_empty(self):
         """
-        Empty flowmap compiles to empty list.
+        Empty flowmap raises exception.
         """
         flowmap = Flowmap()
-        links = flowmap.compile()
-        self.assertEqual(list(links), [])
+        self.assertRaises(FlowmapEmptyError, flowmap.compile)
 
     def test_one_input_one_output(self):
         """
@@ -126,7 +125,7 @@ class FlowmapTestCase(unittest.TestCase):
         flowmap = Flowmap()
         flowmap.connections.append((port_out, port_in))
 
-        self.assertRaises(RuntimeError, flowmap.compile)
+        self.assertRaises(FlowmapPortError, flowmap.compile)
 
     def test_output_duplicate(self):
         """
@@ -141,4 +140,4 @@ class FlowmapTestCase(unittest.TestCase):
         flowmap.connections.append((port_out, port_in_1))
         flowmap.connections.append((port_out, port_in_2))
 
-        self.assertRaises(RuntimeError, flowmap.compile)
+        self.assertRaises(FlowmapPortError, flowmap.compile)

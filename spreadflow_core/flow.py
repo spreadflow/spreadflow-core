@@ -1,3 +1,9 @@
+# -*- coding: utf-8 -*-
+
+"""
+Flowmap builder.
+"""
+
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import unicode_literals
@@ -13,6 +19,33 @@ try:
     StringType = basestring # pylint: disable=undefined-variable
 except NameError:
     StringType = str
+
+class FlowmapError(Exception):
+    """
+    Base exception for all flowmap errors.
+    """
+
+class FlowmapEmptyError(FlowmapError):
+    """
+    There are no connections inside a flowmap or a partition.
+    """
+    def __init__(self, partition=None, message=None):
+        if partition:
+            default_message = 'There are no connections inside the partition ' \
+                '"{:s}"'.format(partition)
+        else:
+            default_message = 'There are no connections in the flowmap'
+
+        super(FlowmapEmptyError, self).__init__(message or default_message)
+        self.partition = partition
+
+class FlowmapPortError(FlowmapError):
+    """
+    One or more ports do not meet requirements.
+    """
+    def __init__(self, ports, message=None):
+        super(FlowmapPortError, self).__init__(message)
+        self.ports = ports
 
 PartitionBounds = namedtuple('PartitionBounds', ['outs', 'ins'])
 
@@ -63,17 +96,22 @@ class Flowmap(object):
 
     @staticmethod
     def _validate_links(connections):
-        if len(connections):
-            outs, ins = zip(*connections)
+        if len(connections) == 0:
+            raise FlowmapEmptyError()
 
-            non_callable_ins = [port for port in ins if not callable(port)]
-            if len(non_callable_ins):
-                raise RuntimeError('Attempting to use a port as input which is not callable')
+        outs, ins = zip(*connections)
 
-            out_counts = Counter(outs).items()
-            multi_outs = [port for port, count in out_counts if count > 1]
-            if len(multi_outs):
-                raise RuntimeError('Attempting to connect more than one input port to a single output port')
+        non_callable_ins = [port for port in ins if not callable(port)]
+        if len(non_callable_ins):
+            raise FlowmapPortError(non_callable_ins, 'Input ports must be '
+                                   'callable')
+
+        out_counts = Counter(outs).items()
+        multi_outs = [port for port, count in out_counts if count > 1]
+        if len(multi_outs):
+            raise FlowmapPortError(multi_outs, 'Output ports must not have '
+                                   'more than one connection')
+
 
 
     @staticmethod
@@ -103,11 +141,17 @@ class Flowmap(object):
             for port in itertools.chain(comp.ins, comp.outs):
                 port_partition.add((port, partition_name))
 
+        if len(port_partition) == 0:
+            raise FlowmapEmptyError(message='No single port is inside a '
+                                    'partition')
+
         ports, part_names = zip(*port_partition)
         port_counts = Counter(ports).items()
         multi_parts = [port for port, count in port_counts if count > 1]
         if len(multi_parts):
-            raise RuntimeError('Attempting to assign a port to multiple partitions')
+            raise FlowmapPortError(multi_parts, 'Ports cannot be part of more '
+                                   'than one partition')
+
 
         port_partition_map = dict(port_partition)
 
