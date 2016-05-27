@@ -239,9 +239,9 @@ class Flowmap(object):
         # Purge/rewire connections.
         mapped_connections = []
         for port_out, port_in in connections:
+            port_out = outmap.get(port_out, port_out)
+            port_in = inmap.get(port_in, port_in)
             if port_out not in inner_ports or port_in not in inner_ports:
-                port_out = outmap.get(port_out, port_out)
-                port_in = inmap.get(port_in, port_in)
                 mapped_connections.append((port_out, port_in))
 
         # Purge/replace components.
