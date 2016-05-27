@@ -38,13 +38,6 @@ class FlowmapTestCase(unittest.TestCase):
     Tests for the Flowmap class.
     """
 
-    def test_empty(self):
-        """
-        Empty flowmap raises exception.
-        """
-        flowmap = Flowmap()
-        self.assertRaises(FlowmapEmptyError, flowmap.compile)
-
     def test_one_input_one_output(self):
         """
         One input port can be connected to one output port.
