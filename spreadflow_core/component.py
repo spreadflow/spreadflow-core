@@ -38,7 +38,9 @@ class RegisteredComponent(object):
         self.visitors = visitors or COMPONENT_VISITORS
 
     def __call__(self, klass):
-        klass.__new__ = RegisteredComponentFactory(klass.__new__, self.visitors)
+        bound_new = klass.__new__
+        wrapped_new = lambda cls, *args, **kwds: bound_new(cls)
+        klass.__new__ = RegisteredComponentFactory(wrapped_new, self.visitors)
         return klass
 
 class PortCollection(collections.Container):
