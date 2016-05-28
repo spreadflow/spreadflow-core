@@ -7,7 +7,7 @@ import copy
 from twisted.internet import defer, task
 from twisted.logger import Logger, LogLevel
 
-from spreadflow_core.component import ComponentBase, PortCollection
+from spreadflow_core.component import ComponentBase
 
 
 class SyntheticSource(object):
@@ -39,36 +39,6 @@ class DebugLog(object):
     def __call__(self, item, send):
         self.log.emit(self.level, self.message, item=item)
         send(item, self)
-
-
-class Compound(PortCollection):
-    """
-    A process wrapping other processes.
-    """
-
-    def __init__(self, children):
-        assert len(children) == len(set(children)), 'Members must be unique'
-        self._children = children
-
-    @property
-    def ins(self):
-        ports = []
-        for member in self._children:
-            if isinstance(member, PortCollection):
-                ports.extend(member.ins)
-            else:
-                ports.append(member)
-        return ports
-
-    @property
-    def outs(self):
-        ports = []
-        for member in self._children:
-            if isinstance(member, PortCollection):
-                ports.extend(member.outs)
-            else:
-                ports.append(member)
-        return ports
 
 
 class Duplicator(ComponentBase):

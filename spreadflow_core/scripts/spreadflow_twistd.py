@@ -5,6 +5,7 @@ from __future__ import unicode_literals
 from twisted.application import service
 from twisted.internet import error
 from twisted.python import log, usage
+from twisted.logger import textFileLogObserver
 from twisted.scripts.twistd import ServerOptions as TwistdServerOptions
 from twisted.scripts.twistd import _SomeApplicationRunner as TwistdApplicationRunner
 
@@ -37,6 +38,9 @@ class SpreadFlowServerOptions(TwistdServerOptions, spreadflow_service.Options):
             raise AttributeError
 
         return object.__getattribute__(self, attr)
+
+def StderrLogger():
+    return textFileLogObserver(sys.stderr)
 
 class ExitOnFailure(object):
     def __init__(self, reactor=None):

@@ -16,7 +16,7 @@ class ConfigTestCase(TestCase):
         with NamedTemporaryFile(delete=False) as tmpfile:
             tmpfile.write(b'from spreadflow_core.script import *')
 
-        flowmap = config_eval(tmpfile.name)
+        flowmap, _, _ = config_eval(tmpfile.name)
         os.unlink(tmpfile.name)
 
         self.assertIsInstance(flowmap, Flowmap)

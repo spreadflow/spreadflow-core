@@ -7,7 +7,9 @@ from __future__ import division
 from __future__ import unicode_literals
 
 from twisted.internet import defer, protocol
-from twisted.internet.endpoints import clientFromString
+from twisted.internet import interfaces
+from twisted.internet.endpoints import clientFromString, serverFromString
+from zope.interface import implementer
 
 
 class MessageHandler(object):
@@ -60,7 +62,7 @@ class SchedulerProtocol(protocol.Protocol):
         Send an outgoing message to the specified input port on the remote
         scheduler.
         """
-        assert self.parser is not None, \
+        assert self.builder is not None, \
             'Protocol factory must set a builder for outgoing messages'
 
         msg = {'port': port, 'item': item}
@@ -83,6 +85,15 @@ class SchedulerProtocol(protocol.Protocol):
         else:
             reason.raiseException()
 
+@implementer(interfaces.IHalfCloseableProtocol)
+class SchedulerServerProtocol(SchedulerProtocol):
+    scheduler = None
+
+    def readConnectionLost(self):
+        self.scheduler.stop(self)
+
+    def writeConnectionLost(self):
+        pass
 
 class SchedulerClientFactory(protocol.ClientFactory):
     """
@@ -101,6 +112,27 @@ class SchedulerClientFactory(protocol.ClientFactory):
         proto.parser = self.parser_factory and self.parser_factory()
         return proto
 
+class SchedulerServerFactory(protocol.ServerFactory):
+    """
+    Server protocol factory for remote schedulers.
+    """
+
+    def __init__(self, scheduler, builder_factory=None, handler=None, parser_factory=None):
+        self.connected = defer.Deferred()
+        self.scheduler = scheduler
+        self.builder_factory = builder_factory
+        self.handler = handler
+        self.parser_factory = parser_factory
+
+    def buildProtocol(self, addr):
+        if not self.connected.called:
+            proto = self.protocol()
+            proto.scheduler = self.scheduler
+            proto.builder = self.builder_factory and self.builder_factory()
+            proto.handler = self.handler
+            proto.parser = self.parser_factory and self.parser_factory()
+            self.connected.callback(proto)
+            return proto
 
 class ClientEndpointMixin(object):
     """
@@ -130,6 +162,42 @@ class ClientEndpointMixin(object):
         factory = self.get_client_protocol_factory(scheduler, reactor)
         endpoint = clientFromString(reactor, self.strport)
         self.peer = yield endpoint.connect(factory)
+
+    @defer.inlineCallbacks
+    def detach(self):
+        if self.peer:
+            yield self.peer.loseConnection()
+        self.peer = None
+
+class ServerEndpointMixin(object):
+    """
+    A mixin providing methods to components relying on twisted server endpoints.
+
+    Attributes:
+        strport (string): The strport description specifying the server to
+            connect to or the process to start.
+        peer (IProtocol): The protocol instance when connected to the endpoint
+            (managed by this mixin). Use it from a subclass to send messages to
+            the peer.
+    """
+
+    peer = None
+    strport = None
+
+    def get_server_protocol_factory(self, scheduler, reactor):
+        """
+        Returns a server protocol factory instance.
+
+        Must be overridden by a subclass.
+        """
+        raise NotImplementedError('Subclass must implement this method')
+
+    @defer.inlineCallbacks
+    def attach(self, scheduler, reactor):
+        factory = self.get_server_protocol_factory(scheduler, reactor)
+        endpoint = serverFromString(reactor, self.strport)
+        endpoint.listen(factory)
+        self.peer = yield factory.connected
 
     @defer.inlineCallbacks
     def detach(self):

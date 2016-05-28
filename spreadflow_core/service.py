@@ -18,11 +18,14 @@ from spreadflow_core.scheduler import Scheduler, JobEvent
 class Options(usage.Options):
     optFlags = [
         ['oneshot', 'o', "Exit after initial execution of the network"],
+        ['multiprocess', 'p', "Launch a separate process for each chain"],
     ]
 
     optParameters = [
         ['confpath', 'c', None, 'Path to configuration file'],
-        ['queuestatus', None, None, 'Path where status should be written to']
+        ['queuestatus', None, None, 'Path where status should be written to'],
+        ['partition', None, None, 'Run the given partition of the graph (internal)'],
+        ['protocol', None, None, 'The IPC protocol to use when running a partition (internal)'],
     ]
 
 
@@ -44,16 +47,27 @@ class SpreadFlowService(service.Service):
         else:
             confpath = os.path.join(os.getcwd(), 'spreadflow.conf')
 
-        flowmap = config_eval(confpath)
+        flowmap, components, annotations = config_eval(confpath)
+        connections = list(flowmap.compile())
+
+        if self.options['multiprocess']:
+            partitions = flowmap.generate_partitions(connections, components, annotations)
+            if (self.options['partition']):
+                partition = partitions[self.options['partition']]
+                connections, components = flowmap.replace_partition_with_worker(
+                    partition, connections, components)
+            else:
+                connections, components = flowmap.replace_partitions_with_controllers(
+                    partitions, connections, components)
 
         self._eventdispatcher = EventDispatcher()
 
         if self.options['oneshot']:
             self._eventdispatcher.add_listener(JobEvent, 0, self._oneshot_job_event_handler)
 
-        flowmap.register_event_handlers(self._eventdispatcher)
+        flowmap.register_event_handlers(self._eventdispatcher, connections, components)
 
-        self._scheduler = Scheduler(dict(flowmap.compile()), self._eventdispatcher)
+        self._scheduler = Scheduler(dict(connections), self._eventdispatcher)
 
         if self.options['queuestatus']:
             statuslog = SpreadFlowQueuestatusLogger(self.options['queuestatus'])

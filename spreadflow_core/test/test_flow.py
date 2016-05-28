@@ -11,8 +11,9 @@ from __future__ import unicode_literals
 
 import unittest
 
-from spreadflow_core.flow import Flowmap
 from spreadflow_core.component import ComponentBase
+from spreadflow_core.flow import Flowmap, FlowmapEmptyError, FlowmapPortError
+from spreadflow_core.subprocess import SubprocessController, SubprocessWorker
 
 class _StaticComponent(ComponentBase):
     """
@@ -36,14 +37,6 @@ class FlowmapTestCase(unittest.TestCase):
     """
     Tests for the Flowmap class.
     """
-
-    def test_empty(self):
-        """
-        Empty flowmap compiles to empty list.
-        """
-        flowmap = Flowmap()
-        links = flowmap.compile()
-        self.assertEqual(list(links), [])
 
     def test_one_input_one_output(self):
         """
@@ -115,6 +108,112 @@ class FlowmapTestCase(unittest.TestCase):
         links = flowmap.compile()
         self.assertEqual(set(links), expected_links)
 
+    def test_partition_substitution(self):
+        """
+        Partitions are substituted by subprocess controllers in main graph.
+        """
+        part_1_upstream = object()
+        part_1_downstream = lambda item: None
+        part_1_out_3 = object()
+        nopart_upstream = lambda item: None
+        nopart_downstream = lambda item: None
+        part_2_upstream = lambda item: None
+        part_2_downstream = lambda item: None
+        part_3_in_1 = lambda item: None
+
+        flowmap = Flowmap()
+        components = []
+        annotations = {}
+
+        flowmap.connections.append((part_1_upstream, part_1_downstream))
+        flowmap.connections.append((part_1_downstream, nopart_upstream))
+        flowmap.connections.append((part_1_out_3, part_3_in_1))
+        flowmap.connections.append((nopart_upstream, nopart_downstream))
+        flowmap.connections.append((nopart_downstream, part_2_upstream))
+        flowmap.connections.append((part_2_upstream, part_2_downstream))
+
+        annotations[part_1_upstream] = {'partition': 'part_1'}
+        annotations[part_1_downstream] = {'partition': 'part_1'}
+        annotations[part_1_out_3] = {'partition': 'part_1'}
+        annotations[part_2_upstream] = {'partition': 'part_2'}
+        annotations[part_2_downstream] = {'partition': 'part_2'}
+        annotations[part_3_in_1] = {'partition': 'part_3'}
+
+        connections = flowmap.compile()
+
+        partitions = flowmap.generate_partitions(connections, components, annotations)
+        connections, components = flowmap.replace_partitions_with_controllers(
+                    partitions, connections, components)
+
+        self.assertEqual(len(components), 3)
+        self.assertIsInstance(components[0], SubprocessController)
+        self.assertIsInstance(components[1], SubprocessController)
+        self.assertIsInstance(components[2], SubprocessController)
+
+        controllers = {comp.strport: comp for comp in components}
+
+        expected_connections = set([
+            (nopart_upstream, nopart_downstream),
+            (controllers['spreadflow-worker:part_1'].outs[0], nopart_upstream),
+            (controllers['spreadflow-worker:part_1'].outs[1], controllers['spreadflow-worker:part_3'].ins[0]),
+            (nopart_downstream, controllers['spreadflow-worker:part_2'].ins[0]),
+        ])
+        self.assertEqual(expected_connections, set(connections))
+
+    def test_partition_isolation(self):
+        """
+        A partition is isolated and connected to one worker in subprocess.
+        """
+        part_1_upstream = object()
+        part_1_downstream = lambda item: None
+        part_1_out_3 = object()
+        nopart_upstream = lambda item: None
+        nopart_downstream = lambda item: None
+        part_2_upstream = lambda item: None
+        part_2_downstream = lambda item: None
+        part_3_in_1 = lambda item: None
+
+        flowmap = Flowmap()
+        components = []
+        annotations = {}
+
+        flowmap.connections.append((part_1_upstream, part_1_downstream))
+        flowmap.connections.append((part_1_downstream, nopart_upstream))
+        flowmap.connections.append((part_1_out_3, part_3_in_1))
+        flowmap.connections.append((nopart_upstream, nopart_downstream))
+        flowmap.connections.append((nopart_downstream, part_2_upstream))
+        flowmap.connections.append((part_2_upstream, part_2_downstream))
+
+        annotations[part_1_upstream] = {'partition': 'part_1'}
+        annotations[part_1_downstream] = {'partition': 'part_1'}
+        annotations[part_1_out_3] = {'partition': 'part_1'}
+        annotations[part_2_upstream] = {'partition': 'part_2'}
+        annotations[part_2_downstream] = {'partition': 'part_2'}
+        annotations[part_3_in_1] = {'partition': 'part_3'}
+
+        connections = flowmap.compile()
+
+        partitions = flowmap.generate_partitions(connections, components, annotations)
+        connections, components = flowmap.replace_partition_with_worker(
+            partitions['part_1'], connections, components)
+
+        self.assertEqual(len(components), 1)
+        self.assertIsInstance(components[0], SubprocessWorker)
+
+        expected_connections = set([
+            (part_1_upstream, part_1_downstream),
+            (part_1_downstream, components[0].ins[0]),
+            (part_1_out_3, components[0].ins[1]),
+        ])
+        self.assertEqual(expected_connections, set(connections))
+
+    def test_empty(self):
+        """
+        Empty flowmap raises exception.
+        """
+        flowmap = Flowmap()
+        self.assertRaises(FlowmapEmptyError, flowmap.compile)
+
     def test_input_not_callable(self):
         """
         Input ports must be callable.
@@ -126,7 +225,7 @@ class FlowmapTestCase(unittest.TestCase):
         flowmap = Flowmap()
         flowmap.connections.append((port_out, port_in))
 
-        self.assertRaises(RuntimeError, flowmap.compile)
+        self.assertRaises(FlowmapPortError, flowmap.compile)
 
     def test_output_duplicate(self):
         """
@@ -141,4 +240,4 @@ class FlowmapTestCase(unittest.TestCase):
         flowmap.connections.append((port_out, port_in_1))
         flowmap.connections.append((port_out, port_in_2))
 
-        self.assertRaises(RuntimeError, flowmap.compile)
+        self.assertRaises(FlowmapPortError, flowmap.compile)
