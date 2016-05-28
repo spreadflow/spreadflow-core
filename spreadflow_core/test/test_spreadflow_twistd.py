@@ -13,6 +13,7 @@ import errno
 import fcntl
 import fixtures
 import os
+import shutil
 import subprocess
 import threading
 import time
@@ -200,6 +201,53 @@ class SpreadflowTwistdIntegrationTestCase(unittest.TestCase):
 
             # Close stdin, this signals the worker process to terminate.
             proc.stdin.close()
+
+            proc.wait()
+            self.assertEqual(proc.returncode, 0)
+
+            for stream, data in reader.drain(0):
+                stream_data[stream] += data
+
+            reader.join()
+
+    def test_subprocess_controller(self):
+        """
+        Controller process runs two workers and collects their output.
+        """
+
+        logger = 'spreadflow_core.scripts.spreadflow_twistd.StderrLogger'
+        config = os.path.join(FIXTURE_DIRECTORY, 'spreadflow-partitions.conf')
+        with fixtures.TempDir() as fix:
+            rundir = fix.path
+            # FIXME: subprocess controller currently does not propagate the
+            # configuration file path to its child processess.
+            shutil.copy(config, os.path.join(rundir, 'spreadflow.conf'))
+            pidfile = os.path.join(rundir, 'twistd.pid')
+            argv = ['-n', '-d', rundir, '--logger', logger]
+            argv += ['--pidfile', pidfile, '--multiprocess']
+            proc = subprocess.Popen(['spreadflow-twistd'] + argv,
+                                    stdout=subprocess.PIPE,
+                                    stderr=subprocess.PIPE)
+
+            stream_data = {proc.stdout: b'', proc.stderr: b''}
+
+            reader = _StreamReader([proc.stdout, proc.stderr])
+            reader.start()
+
+            marker = b'[spreadflow_core.proc.DebugLog#debug] ' \
+                b'Item received: hello world'
+            for stream, data in reader.drain():
+                stream_data[stream] += data
+                if marker in stream_data[proc.stderr]:
+                    break
+            else:
+                self.fail('Worker process is expected to emit a message to stderr')
+
+            # Send SIGTERM to controller.
+            proc.terminate()
+
+            for stream, data in reader.drain(0):
+                stream_data[stream] += data
 
             proc.wait()
             self.assertEqual(proc.returncode, 0)
