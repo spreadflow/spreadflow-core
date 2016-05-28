@@ -134,14 +134,20 @@ class Scheduler(object):
         self.log.failure(fmt, failure, *args, **kwds)
 
     @defer.inlineCallbacks
-    def join(self):
+    def join(self, reactor=None, timeout=10.0):
+        if reactor == None:
+            from twisted.internet import reactor
+
         # Prevent that any queued items are run.
         self._stopped = True
         self._queue_task.pause()
 
         self.log.debug('Detaching sources and services')
         event = DetachEvent(scheduler=self)
-        yield self.eventdispatcher.dispatch(event, fail_mode=FailMode.RETURN).addCallback(self.eventdispatcher.log_failures, event)
+        deferred_detach = self.eventdispatcher.dispatch(event, fail_mode=FailMode.RETURN).addCallback(self.eventdispatcher.log_failures, event)
+        delayed_call = reactor.callLater(timeout, deferred_detach.cancel)
+        yield deferred_detach
+        delayed_call.cancel()
         self.log.debug('Detached sources and services')
 
         # Prevent that new items are enqueued.
