@@ -135,10 +135,11 @@ class ChainTemplate(ProcessTemplate):
                 chain[idx] = element.apply(ctx)
         process = Compound(chain)
 
-        upstream = chain[0]
-        for downstream in chain[1:]:
-            ctx.add(ConnectionToken(upstream, downstream))
-            upstream = downstream
+        if len(chain) > 1:
+            upstream = chain[0]
+            for downstream in chain[1:]:
+                ctx.add(ConnectionToken(upstream, downstream))
+                upstream = downstream
 
         return process
 
@@ -295,21 +296,19 @@ class PortsValidatorPass(object):
 
         connection_list = list(minimize_strict(connection_ops))
 
-        if len(connection_list) == 0:
-            raise CompilerError('Connection list is empty')
+        if len(connection_list) > 0:
+            outs, ins = zip(*connection_list)
 
-        outs, ins = zip(*connection_list)
+            non_callable_ins = [port for port in ins if not callable(port)]
+            if len(non_callable_ins):
+                raise CompilerError(non_callable_ins, 'Input ports must be '
+                                       'callable')
 
-        non_callable_ins = [port for port in ins if not callable(port)]
-        if len(non_callable_ins):
-            raise CompilerError(non_callable_ins, 'Input ports must be '
-                                   'callable')
-
-        out_counts = Counter(outs).items()
-        multi_outs = [port for port, count in out_counts if count > 1]
-        if len(multi_outs):
-            raise CompilerError(multi_outs, 'Output ports must not have '
-                                   'more than one connection')
+            out_counts = Counter(outs).items()
+            multi_outs = [port for port, count in out_counts if count > 1]
+            if len(multi_outs):
+                raise CompilerError(multi_outs, 'Output ports must not have '
+                                       'more than one connection')
 
         return stream
 
@@ -510,8 +509,8 @@ class ComponentsPurgePass(object):
 
         all_ports = list(itertools.chain(*zip(*minimize_strict(connection_ops))))
         for component, in minimize_strict(component_ops):
-            any_port = set(list(component.outs)[:1] + list(component.ins)[:1]).pop()
-            if any_port in all_ports:
+            some_ports = set(list(component.outs)[:1] + list(component.ins)[:1])
+            if len(some_ports) and some_ports.pop() in all_ports:
                 yield AddTokenOp(ComponentToken(component))
 
 class EventHandlersPass(object):
