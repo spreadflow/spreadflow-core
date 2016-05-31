@@ -190,10 +190,18 @@ class Process(object):
 
         process = template.apply(ctx)
 
-        ctx.setdefault(AliasToken(process, self.alias or template_factory.__name__))
-        ctx.setdefault(DescriptionToken(process, self.description or template_factory.__doc__))
-        ctx.setdefault(LabelToken(process, self.label or template_factory.__name__))
-        ctx.setdefault(PartitionToken(process, self.partition))
+        ctx.setdefault(AliasToken(process, template_factory.__name__))
+        ctx.setdefault(DescriptionToken(process, template_factory.__doc__))
+        ctx.setdefault(LabelToken(process, template_factory.__name__))
+
+        if self.alias is not None:
+            ctx.add(AliasToken(process, self.alias))
+        if self.label is not None:
+            ctx.add(LabelToken(process, self.label))
+        if self.description is not None:
+            ctx.add(DescriptionToken(process, self.description))
+        if self.partition is not None:
+            ctx.add(PartitionToken(process, self.partition))
 
         return process
 
