@@ -2,12 +2,14 @@
 Provides utility functions for spreadflow config script.
 """
 
-from spreadflow_core.component import Compound
-from spreadflow_core.flow import Flowmap
-from spreadflow_core.proc import Duplicator
-
-annotations = {} # pylint: disable=C0103
-flowmap = Flowmap() # pylint: disable=C0103
+from spreadflow_core.dsl import \
+    AliasToken, \
+    ChainTemplate, \
+    Context, \
+    DescriptionToken, \
+    DuplicatorTemplate, \
+    LabelToken, \
+    PartitionToken
 
 def Chain(name, *procs, **kw): # pylint: disable=C0103
     """
@@ -15,18 +17,18 @@ def Chain(name, *procs, **kw): # pylint: disable=C0103
     to the default output port of its predecessor.
     """
 
-    compound = Compound(procs)
-    flowmap.aliasmap[name] = compound
+    ctx = Context.top()
+    process = ChainTemplate(chain=procs).apply(ctx)
 
-    annotations[compound] = kw
-    annotations[compound].setdefault('label', name)
+    ctx.add(LabelToken(process, name))
+    ctx.add(AliasToken(process, name))
 
-    upstream = procs[0]
-    for downstream in procs[1:]:
-        flowmap.connections.append((upstream, downstream))
-        upstream = downstream
+    if 'description' in kw:
+        ctx.add(DescriptionToken(process, kw['description']))
+    if 'partition' in kw:
+        ctx.add(PartitionToken(process, kw['partition']))
 
-    return compound
+    return process
 
 def Duplicate(port_in, **kw): # pylint: disable=C0103
     """
@@ -34,19 +36,16 @@ def Duplicate(port_in, **kw): # pylint: disable=C0103
     given input port.
     """
 
-    duplicator = Duplicator()
+    ctx = Context.top()
+    process = DuplicatorTemplate(destination=port_in).apply(ctx)
 
-    annotations[duplicator] = kw
-    annotations[duplicator].setdefault('label', 'copy to ' + port_in)
+    if 'alias' in kw:
+        ctx.add(AliasToken(process, kw['alias']))
+    if 'label' in kw:
+        ctx.add(LabelToken(process, kw['label']))
+    if 'description' in kw:
+        ctx.add(DescriptionToken(process, kw['description']))
+    if 'partition' in kw:
+        ctx.add(PartitionToken(process, kw['partition']))
 
-    flowmap.connections.append((duplicator.out_duplicate, port_in))
-
-    return duplicator
-
-def Annotate(target, **kw): # pylint: disable=C0103
-    """
-    Adds key value pairs as annotations to the given port or component.
-    """
-
-    items = annotations.get(target, {}).items() + kw.items()
-    annotations[target] = dict(items)
+    return process
