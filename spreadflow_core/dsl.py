@@ -373,7 +373,7 @@ class PartitionWorkerPass(object):
         if len(partition_select_tokens) != 1:
             raise CompilerError('Exactly one partition must be selected')
 
-        partition = partition_select_tokens[0].partition
+        selected_partition = partition_select_tokens[0].partition
 
         # Generate partition map.
         partition_tokens = minimize_strict(partition_ops, lambda op: op.token.element)
@@ -387,9 +387,9 @@ class PartitionWorkerPass(object):
         partition_bounds_outs = dict(zip(partitions, partition_outs_list))
         partition_bounds_ins = dict(zip(partitions, partition_ins_list))
 
-        partition_elements = partitions_elements[partition]
-        bounds_outs = partition_bounds_outs[partition]
-        bounds_ins = partition_bounds_ins[partition]
+        inner_ports = partitions_elements[selected_partition]
+        bounds_outs = partition_bounds_outs[selected_partition]
+        bounds_ins = partition_bounds_ins[selected_partition]
 
         innames = list(range(len(bounds_outs)))
         outnames = list(range(len(bounds_ins)))
@@ -401,13 +401,20 @@ class PartitionWorkerPass(object):
         outmap = dict(zip(bounds_outs, worker.ins))
         inmap = dict(zip(bounds_ins, worker.outs))
 
+        emitted_tokens = set()
         for port_out, port_in in minimize_strict(connection_ops):
-            if port_out in partition_elements and port_in in partition_elements:
+            if port_out in inner_ports and port_in in inner_ports:
                 yield AddTokenOp(ConnectionToken(port_out, port_in))
-            elif port_out in partition_elements:
+            elif port_out in inner_ports:
                 yield AddTokenOp(ConnectionToken(port_out, outmap[port_out]))
-            elif port_in in partition_elements:
-                yield AddTokenOp(ConnectionToken(inmap[port_in], port_in))
+            elif port_in in inner_ports:
+                # A workers output port potentially replaces multiple outputs
+                # outside the partition. Hence it is necessary to guard against
+                # adding duplicate connections here.
+                token = ConnectionToken(inmap[port_in], port_in)
+                if token not in emitted_tokens:
+                    emitted_tokens.add(token)
+                    yield AddTokenOp(token)
 
 class PartitionControllersPass(object):
     def __call__(self, stream):
