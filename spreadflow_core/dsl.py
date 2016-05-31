@@ -130,14 +130,13 @@ class ChainTemplate(ProcessTemplate):
 
     def apply(self, ctx):
         chain = list(self.chain)
+        for idx, element in enumerate(chain):
+            if isinstance(element, ProcessTemplate):
+                chain[idx] = element.apply(ctx)
         process = Compound(chain)
 
         upstream = chain[0]
         for downstream in chain[1:]:
-            if isinstance(upstream, ProcessTemplate):
-                upstream = upstream.apply(ctx)
-            if isinstance(downstream, ProcessTemplate):
-                downstream = downstream.apply(ctx)
             ctx.add(ConnectionToken(upstream, downstream))
             upstream = downstream
 
