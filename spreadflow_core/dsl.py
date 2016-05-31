@@ -42,12 +42,9 @@ ConnectionToken = namedtuple('ConnectionToken', ['port_out', 'port_in'])
 DescriptionToken = namedtuple('DescriptionToken', ['element', 'description'])
 EventHandlerToken = namedtuple('EventHandlerToken', ['event_type', 'priority', 'callback'])
 LabelToken = namedtuple('LabelToken', ['element', 'label'])
+PartitionBoundsToken = namedtuple('PartitionBoundsToken', ['partition', 'outs', 'ins'])
 PartitionSelectToken = namedtuple('PartitionSelectToken', ['partition'])
 PartitionToken = namedtuple('PartitionToken', ['element', 'partition'])
-class PartitionBoundsToken(namedtuple('PartitionBoundsToken', ['partition', 'outs', 'ins'])):
-    __slots__ = ()
-    def __hash__(self):
-        return hash(self.partition)
 
 AddTokenOp = namedtuple('AddTokenOp', ['token'])
 SetDefaultTokenOp = namedtuple('SetDefaultTokenOp', ['token'])
@@ -251,13 +248,8 @@ class AliasResolverPass(object):
         for op in stream: yield op
 
         # Generate alias map.
-        alias_tokens = minimize_strict(alias_ops)
+        alias_tokens = minimize_strict(alias_ops, lambda op: op.token.alias)
         elements, aliases = zip(*alias_tokens)
-        alias_counts = Counter(aliases).items()
-        multi_aliases = [alias for alias, count in alias_counts if count > 1]
-        if len(multi_aliases):
-            raise CompilerError('Alias must be unique', multi_aliases)
-
         aliasmap = dict(zip(aliases, elements))
 
         # Generate connection operations.
@@ -323,14 +315,8 @@ class PartitionExpanderPass(object):
         for op in stream: yield op
 
         # Generate partition map.
-        partition_tokens = set(minimize_strict(partition_ops))
-        elements, partitions = zip(*partition_tokens)
-        element_counts = Counter(elements).items()
-        multi_elements = [element for element, count in element_counts if count > 1]
-        if len(multi_elements):
-            raise CompilerError('Elements cannot be in more than one partition', multi_elements)
-
-        partition_map = dict(zip(elements, partitions))
+        partition_tokens = set(minimize_strict(partition_ops, lambda op: op.token.element))
+        partition_map = dict(partition_tokens)
 
         # Process components.
         for component, in minimize_strict(component_ops):
@@ -342,13 +328,7 @@ class PartitionExpanderPass(object):
                 for port in set(component.ins + component.outs):
                     partition_tokens.add(PartitionToken(port, partition_name))
 
-        # Generate updated partition map.
-        elements, partitions = zip(*partition_tokens)
-        element_counts = Counter(elements).items()
-        multi_elements = [element for element, count in element_counts if count > 1]
-        if len(multi_elements):
-            raise CompilerError('Elements cannot be in more than one partition', multi_elements)
-
+        # Produce updated partition map.
         for token in partition_tokens:
             yield AddTokenOp(token)
 
@@ -360,14 +340,9 @@ class PartitionBoundsPass(object):
         for op in stream: yield op
 
         # Generate partition map.
-        partition_tokens = set(minimize_strict(partition_ops))
-        elements, partitions = zip(*partition_tokens)
-        element_counts = Counter(elements).items()
-        multi_elements = [element for element, count in element_counts if count > 1]
-        if len(multi_elements):
-            raise CompilerError('Elements cannot be in more than one partition', multi_elements)
-
-        partition_map = dict(zip(elements, partitions))
+        partition_tokens = minimize_strict(partition_ops, lambda op: op.token.element)
+        partition_map = dict(partition_tokens)
+        partitions = set(partition_map.values())
 
         partition_bounds = {name: PartitionBoundsToken(name, [], []) for name in set(partitions)}
         for port_out, port_in in minimize_strict(connection_ops):
@@ -401,25 +376,14 @@ class PartitionWorkerPass(object):
         partition = partition_select_tokens[0].partition
 
         # Generate partition map.
-        partition_tokens = set(minimize_strict(partition_ops))
-        elements, partitions = zip(*partition_tokens)
-        element_counts = Counter(elements).items()
-        multi_elements = [element for element, count in element_counts if count > 1]
-        if len(multi_elements):
-            raise CompilerError('Elements cannot be in more than one partition', multi_elements)
-
-        partitions_elements = {name: set() for name in set(partitions)}
+        partition_tokens = minimize_strict(partition_ops, lambda op: op.token.element)
+        partitions_elements = {}
         for element, partition in partition_tokens:
-            partitions_elements[partition].add(element)
+            partitions_elements.setdefault(partition, set()).add(element)
 
         # Generate partition_bounds bounds map.
-        partition_bounds_tokens = set(minimize_strict(partition_bounds_ops))
+        partition_bounds_tokens = minimize_strict(partition_bounds_ops, lambda op: op.token.partition)
         partitions, partition_outs_list, partition_ins_list = zip(*partition_bounds_tokens)
-        partition_counts = Counter(partitions).items()
-        multi_partitions = [partition for partition, count in partition_counts if count > 1]
-        if len(multi_partitions):
-            raise CompilerError('Multiple conflicting definitions of partition bounds', multi_partitions)
-
         partition_bounds_outs = dict(zip(partitions, partition_outs_list))
         partition_bounds_ins = dict(zip(partitions, partition_ins_list))
 
@@ -458,25 +422,14 @@ class PartitionControllersPass(object):
         inner_ports = set()
 
         # Generate partition map.
-        partition_tokens = set(minimize_strict(partition_ops))
-        elements, partitions = zip(*partition_tokens)
-        element_counts = Counter(elements).items()
-        multi_elements = [element for element, count in element_counts if count > 1]
-        if len(multi_elements):
-            raise CompilerError('Elements cannot be in more than one partition', multi_elements)
-
-        partitions_elements = {name: set() for name in set(partitions)}
+        partition_tokens = minimize_strict(partition_ops, lambda op: op.token.element)
+        partitions_elements = {}
         for element, partition in partition_tokens:
-            partitions_elements[partition].add(element)
+            partitions_elements.setdefault(partition, set()).add(element)
 
         # Generate partition_bounds bounds map.
-        partition_bounds_tokens = set(minimize_strict(partition_bounds_ops))
+        partition_bounds_tokens = minimize_strict(partition_bounds_ops, lambda op: op.token.partition)
         partitions, partition_outs_list, partition_ins_list = zip(*partition_bounds_tokens)
-        partition_counts = Counter(partitions).items()
-        multi_partitions = [partition for partition, count in partition_counts if count > 1]
-        if len(multi_partitions):
-            raise CompilerError('Multiple conflicting definitions of partition bounds', multi_partitions)
-
         partition_bounds_outs = dict(zip(partitions, partition_outs_list))
         partition_bounds_ins = dict(zip(partitions, partition_ins_list))
 
@@ -521,7 +474,7 @@ class EventHandlersPass(object):
         for op in stream: yield op
 
         all_ports = list(itertools.chain(*zip(*minimize_strict(connection_ops))))
-        all_components = [component for component, in minimize_strict(component_ops)]
+        all_components = [comp for comp, in minimize_strict(component_ops)]
         comps = all_ports + all_components
 
         # Build attach event handlers.
