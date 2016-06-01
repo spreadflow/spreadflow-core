@@ -94,7 +94,10 @@ def stream_divert(stream, token_class):
     remaining_stream = (op for op in tokens if not isinstance(op.token, token_class))
     return extracted_stream, remaining_stream
 
-def minimize_strict(stream, keyfunc=lambda op: op.token):
+def token_map(stream, keyfunc=lambda op: op.token, valuefunc=lambda op: op.token):
+    """
+    Parses a token stream into a mapping. Order of the tokens is preserved.
+    """
     present = {}
     tokens = OrderedDict()
 
@@ -103,20 +106,26 @@ def minimize_strict(stream, keyfunc=lambda op: op.token):
 
         if isinstance(op, AddTokenOp):
             if present.get(key, False):
-                raise DuplicateTokenError(op.token)
+                raise DuplicateTokenError(key, op.token)
             else:
                 present[key] = True
 
-            tokens[key] = op.token
+            tokens[key] = valuefunc(op)
         elif isinstance(op, SetDefaultTokenOp):
-            tokens.setdefault(key, op.token)
+            tokens.setdefault(key, valuefunc(op))
         elif isinstance(op, RemoveTokenOp):
             try:
                 del tokens[key]
             except KeyError:
-                raise NoSuchTokenError(op.token)
+                raise NoSuchTokenError(key, op.token)
 
             present[key] = False
 
-    return tokens.values()
+    return tokens
 
+def token_attr_map(stream, keyattr, valueattr=None):
+    if valueattr is None:
+        valueattr = keyattr
+    extract_key = lambda op: getattr(op.token, keyattr)
+    extract_value = lambda op: getattr(op.token, valueattr)
+    return token_map(stream, extract_key, extract_value)

@@ -9,7 +9,7 @@ from __future__ import division
 from __future__ import unicode_literals
 
 import itertools
-from collections import Counter
+from collections import Counter, namedtuple
 
 from spreadflow_core import scheduler
 from spreadflow_core.component import Compound, PortCollection
@@ -20,9 +20,10 @@ from spreadflow_core.dsl.compiler import \
     AddTokenOp, \
     CompilerError, \
     Context, \
-    minimize_strict, \
     stream_divert, \
-    stream_extract
+    stream_extract, \
+    token_attr_map, \
+    token_map
 
 from spreadflow_core.dsl.tokens import \
     AliasToken, \
@@ -132,6 +133,13 @@ class Process(object):
 
         return process
 
+def portmap(stream):
+    return token_attr_map(stream, 'port_out', 'port_in')
+
+def ports(stream):
+    all_connections = portmap(stream).items()
+    return itertools.chain(*zip(*all_connections))
+
 class AliasResolverPass(object):
     def __call__(self, stream):
         # Capture aliases and connections, yield all the rest
@@ -140,15 +148,13 @@ class AliasResolverPass(object):
         for op in stream: yield op
 
         # Generate alias map.
-        alias_tokens = minimize_strict(alias_ops, lambda op: op.token.alias)
-        elements, aliases = zip(*alias_tokens)
-        aliasmap = dict(zip(aliases, elements))
+        aliases = token_attr_map(alias_ops, 'alias', 'element')
 
         # Generate connection operations.
-        for port_out, port_in in minimize_strict(connection_ops):
+        for port_out, port_in in portmap(connection_ops).items():
             while True:
                 if isinstance(port_out, StringType):
-                    port_out = aliasmap[port_out]
+                    port_out = aliases[port_out]
                 elif isinstance(port_out, PortCollection):
                     if port_out is not port_out.outs[-1]:
                         port_out = port_out.outs[-1]
@@ -159,7 +165,7 @@ class AliasResolverPass(object):
 
             while True:
                 if isinstance(port_in, StringType):
-                    port_in = aliasmap[port_in]
+                    port_in = aliases[port_in]
                 elif isinstance(port_in, PortCollection):
                     if port_in is not port_in.ins[0]:
                         port_in = port_in.ins[0]
@@ -178,7 +184,7 @@ class PortsValidatorPass(object):
     def __call__(self, stream):
         connection_ops, stream = stream_extract(stream, ConnectionToken)
 
-        connection_list = list(minimize_strict(connection_ops))
+        connection_list = list(portmap(connection_ops).items())
 
         if len(connection_list) > 0:
             outs, ins = zip(*connection_list)
@@ -207,22 +213,23 @@ class PartitionExpanderPass(object):
         for op in stream: yield op
 
         # Generate partition map.
-        partition_tokens = set(minimize_strict(partition_ops, lambda op: op.token.element))
-        partition_map = dict(partition_tokens)
+        partition_map = token_attr_map(partition_ops, 'element', 'partition')
 
         # Process components.
-        for component, in minimize_strict(component_ops):
+        for component in token_attr_map(component_ops, 'element'):
             try:
                 partition_name = partition_map[component]
             except KeyError:
                 continue
             else:
                 for port in set(component.ins + component.outs):
-                    partition_tokens.add(PartitionToken(port, partition_name))
+                    partition_map.setdefault(port, partition_name)
 
         # Produce updated partition map.
-        for token in partition_tokens:
-            yield AddTokenOp(token)
+        for element, partition in partition_map.items():
+            yield AddTokenOp(PartitionToken(element, partition))
+
+PartitionBounds = namedtuple('PartitionBounds', ['outs', 'ins'])
 
 class PartitionBoundsPass(object):
     def __call__(self, stream):
@@ -232,12 +239,11 @@ class PartitionBoundsPass(object):
         for op in stream: yield op
 
         # Generate partition map.
-        partition_tokens = minimize_strict(partition_ops, lambda op: op.token.element)
-        partition_map = dict(partition_tokens)
+        partition_map = token_attr_map(partition_ops, 'element', 'partition')
         partitions = set(partition_map.values())
 
-        partition_bounds = {name: PartitionBoundsToken(name, [], []) for name in set(partitions)}
-        for port_out, port_in in minimize_strict(connection_ops):
+        partition_bounds = {name: PartitionBounds([], []) for name in partitions}
+        for port_out, port_in in portmap(connection_ops).items():
             partition_out = partition_map.get(port_out, None)
             partition_in = partition_map.get(port_in, None)
             if partition_out != partition_in:
@@ -248,8 +254,8 @@ class PartitionBoundsPass(object):
                     if port_in not in bounds_ins:
                         bounds_ins.append(port_in)
 
-        for token in partition_bounds.values():
-            yield AddTokenOp(token)
+        for partition, bounds in partition_bounds.items():
+            yield AddTokenOp(PartitionBoundsToken(partition, bounds))
 
 class PartitionWorkerPass(object):
     def __call__(self, stream):
@@ -261,40 +267,37 @@ class PartitionWorkerPass(object):
         for op in stream: yield op
 
         # Find the selected partition.
-        partition_select_tokens = list(minimize_strict(partition_select_ops))
+        partition_select_tokens = list(token_attr_map(partition_select_ops, 'partition'))
         if len(partition_select_tokens) != 1:
             raise CompilerError('Exactly one partition must be selected')
 
-        selected_partition = partition_select_tokens[0].partition
+        selected_partition = partition_select_tokens[0]
 
         # Generate partition map.
-        partition_tokens = minimize_strict(partition_ops, lambda op: op.token.element)
+        partition_map = token_attr_map(partition_ops, 'element', 'partition')
         partitions_elements = {}
-        for element, partition in partition_tokens:
+        for element, partition in partition_map.items():
             partitions_elements.setdefault(partition, set()).add(element)
 
-        # Generate partition_bounds bounds map.
-        partition_bounds_tokens = minimize_strict(partition_bounds_ops, lambda op: op.token.partition)
-        partitions, partition_outs_list, partition_ins_list = zip(*partition_bounds_tokens)
-        partition_bounds_outs = dict(zip(partitions, partition_outs_list))
-        partition_bounds_ins = dict(zip(partitions, partition_ins_list))
+        # Generate partition bounds map.
+        partition_bounds_map = token_attr_map(partition_bounds_ops,
+                                              'partition', 'bounds')
 
         inner_ports = partitions_elements[selected_partition]
-        bounds_outs = partition_bounds_outs[selected_partition]
-        bounds_ins = partition_bounds_ins[selected_partition]
+        bounds = partition_bounds_map[selected_partition]
 
-        innames = list(range(len(bounds_outs)))
-        outnames = list(range(len(bounds_ins)))
+        innames = list(range(len(bounds.outs)))
+        outnames = list(range(len(bounds.ins)))
 
         worker = SubprocessWorker(innames=innames, outnames=outnames)
         yield AddTokenOp(ComponentToken(worker))
 
         # Purge/rewire connections.
-        outmap = dict(zip(bounds_outs, worker.ins))
-        inmap = dict(zip(bounds_ins, worker.outs))
+        outmap = dict(zip(bounds.outs, worker.ins))
+        inmap = dict(zip(bounds.ins, worker.outs))
 
         emitted_tokens = set()
-        for port_out, port_in in minimize_strict(connection_ops):
+        for port_out, port_in in portmap(connection_ops).items():
             if port_out in inner_ports and port_in in inner_ports:
                 yield AddTokenOp(ConnectionToken(port_out, port_in))
             elif port_out in inner_ports:
@@ -321,32 +324,29 @@ class PartitionControllersPass(object):
         inner_ports = set()
 
         # Generate partition map.
-        partition_tokens = minimize_strict(partition_ops, lambda op: op.token.element)
+        partition_map = token_attr_map(partition_ops, 'element', 'partition')
         partitions_elements = {}
-        for element, partition in partition_tokens:
+        for element, partition in partition_map.items():
             partitions_elements.setdefault(partition, set()).add(element)
 
-        # Generate partition_bounds bounds map.
-        partition_bounds_tokens = minimize_strict(partition_bounds_ops, lambda op: op.token.partition)
-        partitions, partition_outs_list, partition_ins_list = zip(*partition_bounds_tokens)
-        partition_bounds_outs = dict(zip(partitions, partition_outs_list))
-        partition_bounds_ins = dict(zip(partitions, partition_ins_list))
+        # Generate partition bounds map.
+        partition_bounds_map = token_attr_map(partition_bounds_ops,
+                                              'partition', 'bounds')
 
         for partition_name, partition_elements in partitions_elements.items():
-            bounds_outs = partition_bounds_outs[partition_name]
-            bounds_ins = partition_bounds_ins[partition_name]
+            bounds = partition_bounds_map[partition_name]
 
-            innames = list(range(len(bounds_ins)))
-            outnames = list(range(len(bounds_outs)))
+            innames = list(range(len(bounds.ins)))
+            outnames = list(range(len(bounds.outs)))
             controller = SubprocessController(partition_name, innames=innames, outnames=outnames)
             yield AddTokenOp(ComponentToken(controller))
 
-            outmap.update(zip(bounds_outs, controller.outs))
-            inmap.update(zip(bounds_ins, controller.ins))
+            outmap.update(zip(bounds.outs, controller.outs))
+            inmap.update(zip(bounds.ins, controller.ins))
             inner_ports.update(partition_elements)
 
         # Purge/rewire connections.
-        for port_out, port_in in minimize_strict(connection_ops):
+        for port_out, port_in in portmap(connection_ops).items():
             port_out = outmap.get(port_out, port_out)
             port_in = inmap.get(port_in, port_in)
             if port_out not in inner_ports or port_in not in inner_ports:
@@ -359,8 +359,8 @@ class ComponentsPurgePass(object):
         connection_ops, stream = stream_extract(stream, ConnectionToken)
         for op in stream: yield op
 
-        all_ports = list(itertools.chain(*zip(*minimize_strict(connection_ops))))
-        for component, in minimize_strict(component_ops):
+        all_ports = list(ports(connection_ops))
+        for component in token_attr_map(component_ops, 'element'):
             some_ports = set(list(component.outs)[:1] + list(component.ins)[:1])
             if len(some_ports) and some_ports.pop() in all_ports:
                 yield AddTokenOp(ComponentToken(component))
@@ -372,9 +372,8 @@ class EventHandlersPass(object):
         connection_ops, stream = stream_extract(stream, ConnectionToken)
         for op in stream: yield op
 
-        all_ports = list(itertools.chain(*zip(*minimize_strict(connection_ops))))
-        all_components = [comp for comp, in minimize_strict(component_ops)]
-        comps = all_ports + all_components
+        comps = list(ports(connection_ops))
+        comps += list(token_attr_map(component_ops, 'element'))
 
         # Build attach event handlers.
         is_attachable = lambda comp: \

@@ -27,8 +27,9 @@ from spreadflow_core.dsl import \
     PartitionSelectToken, \
     PartitionWorkerPass, \
     PortsValidatorPass, \
-    minimize_strict, \
-    stream_extract
+    portmap, \
+    stream_extract, \
+    token_map
 
 class Options(usage.Options):
     optFlags = [
@@ -90,11 +91,10 @@ class SpreadFlowService(service.Service):
             self._eventdispatcher.add_listener(JobEvent, 0, self._oneshot_job_event_handler)
 
         connection_ops, stream = stream_extract(stream, ConnectionToken)
-        connections = minimize_strict(connection_ops)
-        self._scheduler = Scheduler(dict(connections), self._eventdispatcher)
+        self._scheduler = Scheduler(portmap(connection_ops), self._eventdispatcher)
 
         event_handler_ops, stream = stream_extract(stream, EventHandlerToken)
-        event_handlers = minimize_strict(event_handler_ops)
+        event_handlers = token_map(event_handler_ops).values()
         for event_type, priority, callback in event_handlers:
             self._eventdispatcher.add_listener(event_type, priority, callback)
 
