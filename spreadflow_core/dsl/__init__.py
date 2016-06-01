@@ -4,115 +4,44 @@
 Domain-specific language for building up flowmaps.
 """
 
-import inspect
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import unicode_literals
+
 import itertools
-from collections import namedtuple, OrderedDict, Counter
+from collections import Counter
 
 from spreadflow_core import scheduler
-from spreadflow_core.component import Compound, PortCollection, COMPONENT_VISITORS
+from spreadflow_core.component import Compound, PortCollection
 from spreadflow_core.proc import Duplicator
 from spreadflow_core.subprocess import SubprocessWorker, SubprocessController
+
+from spreadflow_core.dsl.compiler import \
+    AddTokenOp, \
+    CompilerError, \
+    Context, \
+    minimize_strict, \
+    stream_divert, \
+    stream_extract
+
+from spreadflow_core.dsl.tokens import \
+    AliasToken, \
+    ComponentToken, \
+    ConnectionToken, \
+    DescriptionToken, \
+    EventHandlerToken, \
+    LabelToken, \
+    PartitionBoundsToken, \
+    PartitionSelectToken, \
+    PartitionToken
 
 try:
     StringType = basestring # pylint: disable=undefined-variable
 except NameError:
     StringType = str
 
-class DSLError(Exception):
+class ProcessDecoratorError(Exception):
     pass
-
-class NoContextError(DSLError):
-    pass
-
-class ProcessDecoratorError(DSLError):
-    pass
-
-class DuplicateTokenError(DSLError):
-    pass
-
-class NoSuchTokenError(DSLError):
-    pass
-
-class CompilerError(DSLError):
-    pass
-
-AliasToken = namedtuple('AliasToken', ['element', 'alias'])
-ComponentToken = namedtuple('ComponentToken', ['element'])
-ConnectionToken = namedtuple('ConnectionToken', ['port_out', 'port_in'])
-DescriptionToken = namedtuple('DescriptionToken', ['element', 'description'])
-EventHandlerToken = namedtuple('EventHandlerToken', ['event_type', 'priority', 'callback'])
-LabelToken = namedtuple('LabelToken', ['element', 'label'])
-PartitionBoundsToken = namedtuple('PartitionBoundsToken', ['partition', 'outs', 'ins'])
-PartitionSelectToken = namedtuple('PartitionSelectToken', ['partition'])
-PartitionToken = namedtuple('PartitionToken', ['element', 'partition'])
-
-AddTokenOp = namedtuple('AddTokenOp', ['token'])
-SetDefaultTokenOp = namedtuple('SetDefaultTokenOp', ['token'])
-RemoveTokenOp = namedtuple('RemoveTokenOp', ['token'])
-
-CONTEXT_STACK = []
-
-class Context(object):
-    """
-    DSL context.
-    """
-
-    _ctx_stack = CONTEXT_STACK
-    _saved_visitors = None
-
-    def __init__(self, origin, stack=None):
-        self.origin = origin
-        self.tokens = []
-        self.stack = stack if stack is not None else inspect.stack()[1:]
-
-    def __enter__(self):
-        self.push(self)
-        self._saved_visitors = list(COMPONENT_VISITORS)
-        COMPONENT_VISITORS.append(self._add_component)
-        return self
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        self.pop(self)
-        if COMPONENT_VISITORS.pop() != self._add_component or COMPONENT_VISITORS != self._saved_visitors:
-            raise RuntimeError('COMPONENT_VISITORS changed during script evaluation')
-        return False
-
-    def setdefault(self, token):
-        self.tokens.append(SetDefaultTokenOp(token))
-
-    def add(self, token):
-        self.tokens.append(AddTokenOp(token))
-
-    def remove(self, token):
-        self.tokens.append(RemoveTokenOp(token))
-
-    def _add_component(self, comp):
-        self.add(ComponentToken(comp))
-
-    @classmethod
-    def push(cls, ctx):
-        """
-        Push the ctx onto the shared stack.
-        """
-        cls._ctx_stack.append(ctx)
-
-    @classmethod
-    def pop(cls, ctx):
-        """
-        Remove the ctx from the shared stack.
-        """
-        top = cls._ctx_stack.pop()
-        assert top is ctx, 'Unbalanced DSL ctx stack'
-
-    @classmethod
-    def top(cls):
-        """
-        Returns the topmost ctx from the stack.
-        """
-        try:
-            return cls._ctx_stack[-1]
-        except IndexError:
-            raise NoContextError()
 
 class ProcessTemplate(object):
     def apply(self, ctx):
@@ -202,43 +131,6 @@ class Process(object):
             ctx.add(PartitionToken(process, self.partition))
 
         return process
-
-def stream_extract(stream, token_class):
-    tokens = list(stream)
-    extracted_stream = (op for op in tokens if isinstance(op.token, token_class))
-    return extracted_stream, tokens
-
-def stream_divert(stream, token_class):
-    tokens = list(stream)
-    extracted_stream = (op for op in tokens if isinstance(op.token, token_class))
-    remaining_stream = (op for op in tokens if not isinstance(op.token, token_class))
-    return extracted_stream, remaining_stream
-
-def minimize_strict(stream, keyfunc=lambda op: op.token):
-    present = {}
-    tokens = OrderedDict()
-
-    for op in stream:
-        key = keyfunc(op)
-
-        if isinstance(op, AddTokenOp):
-            if present.get(key, False):
-                raise DuplicateTokenError(op.token)
-            else:
-                present[key] = True
-
-            tokens[key] = op.token
-        elif isinstance(op, SetDefaultTokenOp):
-            tokens.setdefault(key, op.token)
-        elif isinstance(op, RemoveTokenOp):
-            try:
-                del tokens[key]
-            except KeyError:
-                raise NoSuchTokenError(op.token)
-
-            present[key] = False
-
-    return tokens.values()
 
 class AliasResolverPass(object):
     def __call__(self, stream):
