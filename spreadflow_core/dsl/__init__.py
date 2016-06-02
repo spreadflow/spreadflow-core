@@ -8,6 +8,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import unicode_literals
 
+import inspect
 import itertools
 from collections import Counter, namedtuple
 
@@ -118,7 +119,7 @@ class Process(object):
         process = template.apply(ctx)
 
         ctx.setdefault(AliasToken(process, template_factory.__name__))
-        ctx.setdefault(DescriptionToken(process, template_factory.__doc__))
+        ctx.setdefault(DescriptionToken(process, inspect.cleandoc(template_factory.__doc__ or '')))
         ctx.setdefault(LabelToken(process, template_factory.__name__))
 
         if self.alias is not None:
