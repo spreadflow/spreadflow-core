@@ -63,6 +63,7 @@ class Context(object):
         """
         Push the ctx onto the shared stack.
         """
+        assert isinstance(ctx, cls), 'Argument must be a Context'
         cls._ctx_stack.append(ctx)
 
     @classmethod
