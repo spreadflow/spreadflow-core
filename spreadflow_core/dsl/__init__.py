@@ -22,8 +22,7 @@ from spreadflow_core.dsl.compiler import \
     Context, \
     stream_divert, \
     stream_extract, \
-    token_attr_map, \
-    token_map
+    token_attr_map
 
 from spreadflow_core.dsl.tokens import \
     AliasToken, \
