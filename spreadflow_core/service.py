@@ -15,21 +15,23 @@ from spreadflow_core.config import config_eval
 from spreadflow_core.eventdispatcher import EventDispatcher
 from spreadflow_core.scheduler import Scheduler, JobEvent
 from spreadflow_core.dsl import \
-    AddTokenOp, \
     AliasResolverPass, \
     ComponentsPurgePass, \
-    ConnectionToken, \
-    EventHandlerToken, \
     EventHandlersPass, \
     PartitionBoundsPass, \
     PartitionControllersPass, \
     PartitionExpanderPass, \
-    PartitionSelectToken, \
     PartitionWorkerPass, \
     PortsValidatorPass, \
-    portmap, \
+    portmap
+from spreadflow_core.dsl.compiler import \
+    AddTokenOp, \
     stream_extract, \
     token_map
+from spreadflow_core.dsl.tokens import \
+    ConnectionToken, \
+    EventHandlerToken, \
+    PartitionSelectToken
 
 class Options(usage.Options):
     optFlags = [
