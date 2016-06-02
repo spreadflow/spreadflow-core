@@ -14,6 +14,24 @@ from zope.interface import provider
 from spreadflow_core.config import config_eval
 from spreadflow_core.eventdispatcher import EventDispatcher
 from spreadflow_core.scheduler import Scheduler, JobEvent
+from spreadflow_core.dsl import \
+    AliasResolverPass, \
+    ComponentsPurgePass, \
+    EventHandlersPass, \
+    PartitionBoundsPass, \
+    PartitionControllersPass, \
+    PartitionExpanderPass, \
+    PartitionWorkerPass, \
+    PortsValidatorPass, \
+    portmap
+from spreadflow_core.dsl.compiler import \
+    AddTokenOp, \
+    stream_extract, \
+    token_map
+from spreadflow_core.dsl.tokens import \
+    ConnectionToken, \
+    EventHandlerToken, \
+    PartitionSelectToken
 
 class Options(usage.Options):
     optFlags = [
@@ -47,27 +65,40 @@ class SpreadFlowService(service.Service):
         else:
             confpath = os.path.join(os.getcwd(), 'spreadflow.conf')
 
-        flowmap, components, annotations = config_eval(confpath)
-        connections = list(flowmap.compile())
+        stream = config_eval(confpath)
+
+        pipeline = list()
+        pipeline.append(AliasResolverPass())
+        pipeline.append(PortsValidatorPass())
 
         if self.options['multiprocess']:
-            partitions = flowmap.generate_partitions(connections, components, annotations)
-            if (self.options['partition']):
-                partition = partitions[self.options['partition']]
-                connections, components = flowmap.replace_partition_with_worker(
-                    partition, connections, components)
+            pipeline.append(PartitionExpanderPass())
+            pipeline.append(PartitionBoundsPass())
+            if self.options['partition']:
+                pipeline.append(PartitionWorkerPass())
+                partition = self.options['partition']
+                stream.append(AddTokenOp(PartitionSelectToken(partition)))
             else:
-                connections, components = flowmap.replace_partitions_with_controllers(
-                    partitions, connections, components)
+                pipeline.append(PartitionControllersPass())
+
+        pipeline.append(ComponentsPurgePass())
+        pipeline.append(EventHandlersPass())
+
+        for compiler_step in pipeline:
+            stream = compiler_step(stream)
 
         self._eventdispatcher = EventDispatcher()
 
         if self.options['oneshot']:
             self._eventdispatcher.add_listener(JobEvent, 0, self._oneshot_job_event_handler)
 
-        flowmap.register_event_handlers(self._eventdispatcher, connections, components)
+        connection_ops, stream = stream_extract(stream, ConnectionToken)
+        self._scheduler = Scheduler(portmap(connection_ops), self._eventdispatcher)
 
-        self._scheduler = Scheduler(dict(connections), self._eventdispatcher)
+        event_handler_ops, stream = stream_extract(stream, EventHandlerToken)
+        event_handlers = token_map(event_handler_ops).values()
+        for event_type, priority, callback in event_handlers:
+            self._eventdispatcher.add_listener(event_type, priority, callback)
 
         if self.options['queuestatus']:
             statuslog = SpreadFlowQueuestatusLogger(self.options['queuestatus'])

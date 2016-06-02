@@ -9,8 +9,8 @@ from __future__ import division
 from __future__ import unicode_literals
 
 import collections
-
-COMPONENT_VISITORS = []
+from spreadflow_core.dsl.compiler import Context, NoContextError
+from spreadflow_core.dsl.tokens import ComponentToken
 
 class RegisteredComponentFactory(object):
     """
@@ -18,14 +18,19 @@ class RegisteredComponentFactory(object):
     created instance.
     """
 
-    def __init__(self, factory, visitors=None):
+    def __init__(self, factory, context=None):
         self.factory = factory
-        self.visitors = visitors or COMPONENT_VISITORS
+        self.context = context
 
     def __call__(self, *args, **kwds):
         inst = self.factory(*args, **kwds)
-        for visitor in self.visitors:
-            visitor(inst)
+        if self.context is None:
+            try:
+                context = Context.top()
+            except NoContextError:
+                pass
+            else:
+                context.add(ComponentToken(inst))
         return inst
 
 class RegisteredComponent(object):
@@ -34,13 +39,13 @@ class RegisteredComponent(object):
     directly act as a port.
     """
 
-    def __init__(self, visitors=None):
-        self.visitors = visitors or COMPONENT_VISITORS
+    def __init__(self, context=None):
+        self.context = context
 
     def __call__(self, klass):
         bound_new = klass.__new__
         wrapped_new = lambda cls, *args, **kwds: bound_new(cls)
-        klass.__new__ = RegisteredComponentFactory(wrapped_new, self.visitors)
+        klass.__new__ = RegisteredComponentFactory(wrapped_new, self.context)
         return klass
 
 class PortCollection(collections.Container):
