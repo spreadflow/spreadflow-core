@@ -22,6 +22,8 @@ from spreadflow_core.dsl.tokens import \
     AliasToken, \
     ComponentToken, \
     ConnectionToken, \
+    DefaultInputToken, \
+    DefaultOutputToken, \
     EventHandlerToken, \
     PartitionBoundsToken, \
     PartitionSelectToken, \
@@ -48,32 +50,30 @@ class AliasResolverPass(object):
         # Capture aliases and connections, yield all the rest
         alias_ops, stream = stream_divert(stream, AliasToken)
         connection_ops, stream = stream_divert(stream, ConnectionToken)
+        default_in_ops, stream = stream_divert(stream, DefaultInputToken)
+        default_out_ops, stream = stream_divert(stream, DefaultOutputToken)
         for op in stream: yield op
 
         # Generate alias map.
         aliases = token_attr_map(alias_ops, 'alias', 'element')
+        default_inputs = token_attr_map(default_in_ops, 'element', 'port')
+        default_outputs = token_attr_map(default_out_ops, 'element', 'port')
 
         # Generate connection operations.
         for port_out, port_in in portmap(connection_ops).items():
             while True:
                 if isinstance(port_out, StringType):
                     port_out = aliases[port_out]
-                elif isinstance(port_out, PortCollection):
-                    if port_out is not port_out.outs[-1]:
-                        port_out = port_out.outs[-1]
-                    else:
-                        break
+                elif port_out in default_outputs:
+                    port_out = default_outputs[port_out]
                 else:
                     break
 
             while True:
                 if isinstance(port_in, StringType):
                     port_in = aliases[port_in]
-                elif isinstance(port_in, PortCollection):
-                    if port_in is not port_in.ins[0]:
-                        port_in = port_in.ins[0]
-                    else:
-                        break
+                elif port_in in default_inputs:
+                    port_in = default_inputs[port_in]
                 else:
                     break
 

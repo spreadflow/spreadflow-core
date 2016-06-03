@@ -13,6 +13,8 @@ from collections import namedtuple
 AliasToken = namedtuple('AliasToken', ['element', 'alias'])
 ComponentToken = namedtuple('ComponentToken', ['element'])
 ConnectionToken = namedtuple('ConnectionToken', ['port_out', 'port_in'])
+DefaultInputToken = namedtuple('DefaultInputToken', ['element', 'port'])
+DefaultOutputToken = namedtuple('DefaultOutputToken', ['element', 'port'])
 DescriptionToken = namedtuple('DescriptionToken', ['element', 'description'])
 EventHandlerToken = namedtuple('EventHandlerToken', ['event_type', 'priority', 'callback'])
 LabelToken = namedtuple('LabelToken', ['element', 'label'])

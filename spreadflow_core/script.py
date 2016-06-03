@@ -10,6 +10,8 @@ from spreadflow_core.dsl.tokens import \
     AliasToken, \
     ComponentToken, \
     ConnectionToken, \
+    DefaultInputToken, \
+    DefaultOutputToken, \
     DescriptionToken, \
     LabelToken, \
     PartitionToken
@@ -39,6 +41,8 @@ class ChainTemplate(ProcessTemplate):
                 ctx.add(ConnectionToken(upstream, downstream))
                 upstream = downstream
 
+        ctx.add(DefaultInputToken(process, chain[0]))
+        ctx.add(DefaultOutputToken(process, chain[-1]))
         ctx.add(ComponentToken(process))
 
         return process
