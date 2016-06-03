@@ -8,12 +8,12 @@ from spreadflow_core.component import Compound
 from spreadflow_core.dsl.context import Context
 from spreadflow_core.dsl.tokens import \
     AliasToken, \
-    ComponentToken, \
     ConnectionToken, \
     DefaultInputToken, \
     DefaultOutputToken, \
     DescriptionToken, \
     LabelToken, \
+    ParentElementToken, \
     PartitionToken
 from spreadflow_core.proc import Duplicator
 
@@ -30,20 +30,28 @@ class ChainTemplate(ProcessTemplate):
 
     def apply(self, ctx):
         chain = list(self.chain)
+
+        # Apply (sub)templates if necessary.
         for idx, element in enumerate(chain):
             if isinstance(element, ProcessTemplate):
                 chain[idx] = element.apply(ctx)
+
         process = Compound(chain)
 
+        # Set the parent for all processes in the chain.
+        for element in chain:
+            ctx.add(ParentElementToken(element, process))
+
+        # Connect all ports in the chain.
         if len(chain) > 1:
             upstream = chain[0]
             for downstream in chain[1:]:
                 ctx.add(ConnectionToken(upstream, downstream))
                 upstream = downstream
 
+        # Set default input to first and default output to the last port.
         ctx.add(DefaultInputToken(process, chain[0]))
         ctx.add(DefaultOutputToken(process, chain[-1]))
-        ctx.add(ComponentToken(process))
 
         return process
 
@@ -57,11 +65,15 @@ class DuplicatorTemplate(ProcessTemplate):
     def apply(self, ctx):
         process = Duplicator()
 
+        # Apply (sub)template if necessary.
         destination = self.destination
         if isinstance(destination, ProcessTemplate):
             destination = destination.apply(ctx)
 
-        ctx.add(ComponentToken(process))
+        # Set the parent for the secondary output.
+        ctx.add(ParentElementToken(process.out_duplicate, process))
+
+        # Connect the secondary output to the given downstream port.
         ctx.add(ConnectionToken(process.out_duplicate, destination))
         ctx.setdefault(LabelToken(process, 'Copy to "{:s}"'.format(destination)))
 

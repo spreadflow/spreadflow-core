@@ -8,11 +8,10 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import unicode_literals
 
-from spreadflow_core.component import ComponentBase
 from spreadflow_core.remote import ClientEndpointMixin, MessageHandler, SchedulerClientFactory, SchedulerProtocol, SchedulerServerFactory, SchedulerServerProtocol, ServerEndpointMixin
 from spreadflow_core.format import PickleMessageParser, PickleMessageBuilder
 
-class SubprocessWorker(ServerEndpointMixin, ComponentBase):
+class SubprocessWorker(ServerEndpointMixin):
     """
     Subprocess worker component.
 
@@ -49,7 +48,7 @@ class SubprocessWorker(ServerEndpointMixin, ComponentBase):
                                                   handler=handler,
                                                   parser_factory=lambda: PickleMessageParser(2**23))
 
-class SubprocessController(ClientEndpointMixin, ComponentBase):
+class SubprocessController(ClientEndpointMixin):
     """
     Subprocess controller component.
 

@@ -10,9 +10,9 @@ from __future__ import unicode_literals
 
 import itertools
 from collections import Counter, namedtuple
+from toposort import toposort_flatten
 
-from spreadflow_core import scheduler
-from spreadflow_core.component import PortCollection
+from spreadflow_core import scheduler, graph
 from spreadflow_core.dsl.stream import \
     AddTokenOp, \
     stream_divert, \
@@ -20,11 +20,11 @@ from spreadflow_core.dsl.stream import \
     token_attr_map
 from spreadflow_core.dsl.tokens import \
     AliasToken, \
-    ComponentToken, \
     ConnectionToken, \
     DefaultInputToken, \
     DefaultOutputToken, \
     EventHandlerToken, \
+    ParentElementToken, \
     PartitionBoundsToken, \
     PartitionSelectToken, \
     PartitionToken
@@ -41,6 +41,13 @@ def portmap(stream):
 def ports(stream):
     all_connections = portmap(stream).items()
     return itertools.chain(*zip(*all_connections))
+
+def parentmap(stream):
+    return token_attr_map(stream, 'element', 'parent')
+
+def treenodes(stream):
+    all_nodes = parentmap(stream).items()
+    return itertools.chain(*zip(*all_nodes))
 
 class ParserError(Exception):
     pass
@@ -111,22 +118,24 @@ class PartitionExpanderPass(object):
     """
     def __call__(self, stream):
         # Capture partitions, read components, yield all the rest
+        parent_ops, stream = stream_extract(stream, ParentElementToken)
         partition_ops, stream = stream_divert(stream, PartitionToken)
-        component_ops, stream = stream_extract(stream, ComponentToken)
         for op in stream: yield op
 
-        # Generate partition map.
+        # Generate parent map and partition map.
+        parent_map = parentmap(parent_ops)
         partition_map = token_attr_map(partition_ops, 'element', 'partition')
 
-        # Process components.
-        for component in token_attr_map(component_ops, 'element'):
+        # Inherit partition settings by walking down the component tree in
+        # topological order.
+        for element in toposort_flatten(graph.digraph(parent_map.items())):
             try:
-                partition_name = partition_map[component]
+                parent_element = parent_map[element]
+                parent_partition = partition_map[parent_element]
             except KeyError:
                 continue
-            else:
-                for port in set(component.ins + component.outs):
-                    partition_map.setdefault(port, partition_name)
+
+            partition_map.setdefault(element, parent_partition)
 
         # Produce updated partition map.
         for element, partition in partition_map.items():
@@ -193,7 +202,8 @@ class PartitionWorkerPass(object):
         outnames = list(range(len(bounds.ins)))
 
         worker = SubprocessWorker(innames=innames, outnames=outnames)
-        yield AddTokenOp(ComponentToken(worker))
+        for port in worker.ins + worker.outs:
+            yield AddTokenOp(ParentElementToken(port, worker))
 
         # Purge/rewire connections.
         outmap = dict(zip(bounds.outs, worker.ins))
@@ -242,7 +252,8 @@ class PartitionControllersPass(object):
             innames = list(range(len(bounds.ins)))
             outnames = list(range(len(bounds.outs)))
             controller = SubprocessController(partition_name, innames=innames, outnames=outnames)
-            yield AddTokenOp(ComponentToken(controller))
+            for port in controller.ins + controller.outs:
+                yield AddTokenOp(ParentElementToken(port, controller))
 
             outmap.update(zip(bounds.outs, controller.outs))
             inmap.update(zip(bounds.ins, controller.ins))
@@ -257,26 +268,32 @@ class PartitionControllersPass(object):
 
 class ComponentsPurgePass(object):
     def __call__(self, stream):
-        # Capture components, read connections, yield the rest.
-        component_ops, stream = stream_divert(stream, ComponentToken)
+        # Capture parents, read connections, yield the rest.
         connection_ops, stream = stream_extract(stream, ConnectionToken)
+        parent_ops, stream = stream_divert(stream, ParentElementToken)
         for op in stream: yield op
 
-        all_ports = list(ports(connection_ops))
-        for component in token_attr_map(component_ops, 'element'):
-            some_ports = set(list(component.outs)[:1] + list(component.ins)[:1])
-            if len(some_ports) and some_ports.pop() in all_ports:
-                yield AddTokenOp(ComponentToken(component))
+        # Initialize connected elements set with all connected ports and set up
+        # parent map.
+        connected_elements = set(ports(connection_ops))
+        parent_map = parentmap(parent_ops)
+
+        # Walk the component tree from leaves to roots and collect connected
+        # elements on the way down.
+        for child in toposort_flatten(graph.reverse(graph.digraph(parent_map.items()))):
+            if child in connected_elements and child in parent_map:
+                parent = parent_map[child]
+                connected_elements.add(parent)
+                yield AddTokenOp(ParentElementToken(child, parent))
 
 class EventHandlersPass(object):
     def __call__(self, stream):
         # Read components and connections, yield everything.
-        component_ops, stream = stream_extract(stream, ComponentToken)
+        parent_ops, stream = stream_extract(stream, ParentElementToken)
         connection_ops, stream = stream_extract(stream, ConnectionToken)
         for op in stream: yield op
 
-        comps = list(ports(connection_ops))
-        comps += list(token_attr_map(component_ops, 'element'))
+        comps = set(list(ports(connection_ops)) + list(treenodes(parent_ops)))
 
         # Build attach event handlers.
         is_attachable = lambda comp: \

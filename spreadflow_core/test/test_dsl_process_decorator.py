@@ -16,7 +16,6 @@ from spreadflow_core.dsl.context import Context
 from spreadflow_core.dsl.stream import SetDefaultTokenOp, AddTokenOp
 from spreadflow_core.dsl.tokens import \
     AliasToken, \
-    ComponentToken, \
     ConnectionToken, \
     DescriptionToken, \
     LabelToken, \
@@ -81,7 +80,6 @@ class ProcessDecoratorTestCase(unittest.TestCase):
         self.assertListEqual(trivial_proc.outs, [port])
 
         tokens = outer_ctx.tokens
-        self.assertIn(AddTokenOp(ComponentToken(trivial_proc)), tokens)
         self.assertIn(SetDefaultTokenOp(AliasToken(trivial_proc, 'trivial_proc')), tokens)
         self.assertIn(SetDefaultTokenOp(LabelToken(trivial_proc, 'trivial_proc')), tokens)
         self.assertIn(SetDefaultTokenOp(DescriptionToken(trivial_proc, 'Docs for another trivial process.')), tokens)
@@ -171,7 +169,6 @@ class LegacyScriptTestCase(unittest.TestCase):
         self.assertListEqual(process.outs, [port1, port2, port3])
 
         tokens = ctx.tokens
-        self.assertIn(AddTokenOp(ComponentToken(process)), tokens)
         self.assertIn(AddTokenOp(AliasToken(process, 'legacy_chain')), tokens)
         self.assertIn(AddTokenOp(LabelToken(process, 'legacy_chain')), tokens)
         self.assertIn(AddTokenOp(DescriptionToken(process, 'some legacy chain')), tokens)
@@ -184,5 +181,4 @@ class LegacyScriptTestCase(unittest.TestCase):
         with Context(self) as ctx:
             process = Duplicate('other chain')
 
-        self.assertIn(AddTokenOp(ComponentToken(process)), ctx.tokens)
         self.assertIn(AddTokenOp(ConnectionToken(process.out_duplicate, 'other chain')), ctx.tokens)
