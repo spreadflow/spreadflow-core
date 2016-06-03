@@ -11,10 +11,17 @@ from __future__ import unicode_literals
 
 import unittest
 
-from spreadflow_core.dsl.compiler import \
-    Context, NoContextError, SetDefaultTokenOp, AddTokenOp, RemoveTokenOp, \
-    stream_extract, stream_divert, token_map, token_attr_map, \
-    DuplicateTokenError, NoSuchTokenError
+from spreadflow_core.dsl.context import Context, NoContextError
+from spreadflow_core.dsl.stream import \
+    AddTokenOp, \
+    DuplicateTokenError, \
+    NoSuchTokenError, \
+    RemoveTokenOp, \
+    SetDefaultTokenOp, \
+    stream_divert, \
+    stream_extract, \
+    token_attr_map, \
+    token_map
 
 class ContextTestCase(unittest.TestCase):
     """

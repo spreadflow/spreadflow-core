@@ -9,7 +9,7 @@ from __future__ import division
 from __future__ import unicode_literals
 
 import collections
-from spreadflow_core.dsl.compiler import Context, NoContextError
+from spreadflow_core.dsl.context import Context, NoContextError
 from spreadflow_core.dsl.tokens import ComponentToken
 
 class RegisteredComponentFactory(object):

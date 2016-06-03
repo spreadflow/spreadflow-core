@@ -14,7 +14,7 @@ from zope.interface import provider
 from spreadflow_core.config import config_eval
 from spreadflow_core.eventdispatcher import EventDispatcher
 from spreadflow_core.scheduler import Scheduler, JobEvent
-from spreadflow_core.dsl import \
+from spreadflow_core.dsl.parser import \
     AliasResolverPass, \
     ComponentsPurgePass, \
     EventHandlersPass, \
@@ -24,7 +24,7 @@ from spreadflow_core.dsl import \
     PartitionWorkerPass, \
     PortsValidatorPass, \
     portmap
-from spreadflow_core.dsl.compiler import \
+from spreadflow_core.dsl.stream import \
     AddTokenOp, \
     stream_extract, \
     token_map

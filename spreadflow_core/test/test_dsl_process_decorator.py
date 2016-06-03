@@ -11,12 +11,17 @@ from __future__ import unicode_literals
 
 import unittest
 
-from spreadflow_core.dsl.compiler import Context, SetDefaultTokenOp, AddTokenOp
 from spreadflow_core.component import Compound
-from spreadflow_core.dsl import Process, ProcessTemplate, \
-    AliasToken, ComponentToken, ConnectionToken, LabelToken, DescriptionToken, PartitionToken
-
-from spreadflow_core.script import Chain, Duplicate
+from spreadflow_core.dsl.context import Context
+from spreadflow_core.dsl.stream import SetDefaultTokenOp, AddTokenOp
+from spreadflow_core.dsl.tokens import \
+    AliasToken, \
+    ComponentToken, \
+    ConnectionToken, \
+    DescriptionToken, \
+    LabelToken, \
+    PartitionToken
+from spreadflow_core.script import Chain, Duplicate, Process, ProcessTemplate
 
 class ProcessDecoratorTestCase(unittest.TestCase):
     """

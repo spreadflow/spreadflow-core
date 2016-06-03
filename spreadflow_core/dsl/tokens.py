@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 """
-Domain-specific language for building up flowmaps.
+Tokens used in the domain-specific language for building up flowmaps.
 """
 
 from __future__ import absolute_import

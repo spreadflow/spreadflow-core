@@ -3,7 +3,7 @@ from __future__ import division
 from __future__ import unicode_literals
 
 import imp
-from spreadflow_core.dsl import Context
+from spreadflow_core.dsl.context import Context
 
 def config_eval(path):
     module_name = 'spreadflow_core._conf{:X}'.format(hash(path))
