@@ -9,44 +9,6 @@ from __future__ import division
 from __future__ import unicode_literals
 
 import collections
-from spreadflow_core.dsl.context import Context, NoContextError
-from spreadflow_core.dsl.tokens import ComponentToken
-
-class RegisteredComponentFactory(object):
-    """
-    A decorator for factory functions/methods which calls all visitors for any
-    created instance.
-    """
-
-    def __init__(self, factory, context=None):
-        self.factory = factory
-        self.context = context
-
-    def __call__(self, *args, **kwds):
-        inst = self.factory(*args, **kwds)
-        if self.context is None:
-            try:
-                context = Context.top()
-            except NoContextError:
-                pass
-            else:
-                context.add(ComponentToken(inst))
-        return inst
-
-class RegisteredComponent(object):
-    """
-    A class decorator for components which are associated with ports but do not
-    directly act as a port.
-    """
-
-    def __init__(self, context=None):
-        self.context = context
-
-    def __call__(self, klass):
-        bound_new = klass.__new__
-        wrapped_new = lambda cls, *args, **kwds: bound_new(cls)
-        klass.__new__ = RegisteredComponentFactory(wrapped_new, self.context)
-        return klass
 
 class PortCollection(collections.Container):
     """
@@ -67,7 +29,6 @@ class PortCollection(collections.Container):
         """
         raise NotImplementedError()
 
-@RegisteredComponent()
 class ComponentBase(PortCollection):
     """
     A process with separate/multiple input and output ports.
@@ -84,7 +45,6 @@ class ComponentBase(PortCollection):
     def __contains__(self, port):
         return port in self.outs or port in self.ins
 
-@RegisteredComponent()
 class Compound(PortCollection):
     """
     A process wrapping other processes.

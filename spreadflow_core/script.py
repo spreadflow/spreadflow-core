@@ -8,8 +8,9 @@ from spreadflow_core.component import Compound
 from spreadflow_core.dsl.context import Context
 from spreadflow_core.dsl.tokens import \
     AliasToken, \
-    DescriptionToken, \
+    ComponentToken, \
     ConnectionToken, \
+    DescriptionToken, \
     LabelToken, \
     PartitionToken
 from spreadflow_core.proc import Duplicator
@@ -38,6 +39,8 @@ class ChainTemplate(ProcessTemplate):
                 ctx.add(ConnectionToken(upstream, downstream))
                 upstream = downstream
 
+        ctx.add(ComponentToken(process))
+
         return process
 
 class DuplicatorTemplate(ProcessTemplate):
@@ -54,6 +57,7 @@ class DuplicatorTemplate(ProcessTemplate):
         if isinstance(destination, ProcessTemplate):
             destination = destination.apply(ctx)
 
+        ctx.add(ComponentToken(process))
         ctx.add(ConnectionToken(process.out_duplicate, destination))
         ctx.setdefault(LabelToken(process, 'Copy to "{:s}"'.format(destination)))
 
