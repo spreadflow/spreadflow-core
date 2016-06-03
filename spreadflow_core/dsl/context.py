@@ -14,7 +14,9 @@ from spreadflow_core.dsl.stream import \
     AddTokenOp, SetDefaultTokenOp, RemoveTokenOp
 
 class NoContextError(Exception):
-    pass
+    """
+    Raised a global context is expected but none exists.
+    """
 
 CONTEXT_STACK = []
 
@@ -39,12 +41,21 @@ class Context(object):
         return False
 
     def setdefault(self, token):
+        """
+        Add a set-default operation to the stream.
+        """
         self.tokens.append(SetDefaultTokenOp(token))
 
     def add(self, token):
+        """
+        Add an add-token operation to the stream.
+        """
         self.tokens.append(AddTokenOp(token))
 
     def remove(self, token):
+        """
+        Add a remove-token operation to the stream.
+        """
         self.tokens.append(RemoveTokenOp(token))
 
     @classmethod
