@@ -40,7 +40,7 @@ def ports(stream):
     all_connections = portmap(stream).items()
     return itertools.chain(*zip(*all_connections))
 
-class ParserError(object):
+class ParserError(Exception):
     pass
 
 class AliasResolverPass(object):
