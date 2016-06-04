@@ -90,6 +90,12 @@ class SpreadflowTwistdIntegrationTestCase(unittest.TestCase):
     Integration tests for spreadflow twistd application runner.
     """
 
+    longMessage = True
+
+    def _format_stream(self, stdout, stderr):
+        return '\nSTDOUT:\n{0}\nSTDERR:\n{1}'.format(
+            stdout or '*** EMPTY ***', stderr or '*** EMPTY ***')
+
     def test_oneshot(self):
         """
         Process should exit with a zero result.
@@ -103,7 +109,7 @@ class SpreadflowTwistdIntegrationTestCase(unittest.TestCase):
                                     stdout=subprocess.PIPE,
                                     stderr=subprocess.PIPE)
             stdout_value, stderr_value = proc.communicate()
-            self.assertEqual(proc.returncode, 0)
+            self.assertEqual(proc.returncode, 0, self._format_stream(stdout_value, stderr_value))
 
     def test_exit_on_failure(self):
         """
@@ -118,7 +124,7 @@ class SpreadflowTwistdIntegrationTestCase(unittest.TestCase):
                                     stdout=subprocess.PIPE,
                                     stderr=subprocess.PIPE)
             stdout_value, stderr_value = proc.communicate()
-            self.assertEqual(proc.returncode, 1)
+            self.assertEqual(proc.returncode, 1, self._format_stream(stdout_value, stderr_value))
 
     def test_subprocess_worker_producer(self):
         """
@@ -149,13 +155,13 @@ class SpreadflowTwistdIntegrationTestCase(unittest.TestCase):
                 if stream_data[proc.stdout]:
                     break
             else:
-                self.fail('Worker process is expected to emit a message to stdout')
+                self.fail('Worker process is expected to emit a message to stdout{0}'.format(self._format_stream('*** BINARY ***', stream_data[proc.stderr])))
 
             # Close stdin, this signals the worker process to terminate.
             proc.stdin.close()
 
             proc.wait()
-            self.assertEqual(proc.returncode, 0)
+            self.assertEqual(proc.returncode, 0, self._format_stream('*** BINARY ***', stream_data[proc.stderr]))
 
             for stream, data in reader.drain(0):
                 stream_data[stream] += data
@@ -197,13 +203,13 @@ class SpreadflowTwistdIntegrationTestCase(unittest.TestCase):
                 if marker in stream_data[proc.stderr]:
                     break
             else:
-                self.fail('Worker process is expected to emit a message to stderr')
+                self.fail('Worker process is expected to emit a message to stderr{0}'.format(self._format_stream(stream_data[proc.stdout], stream_data[proc.stderr])))
 
             # Close stdin, this signals the worker process to terminate.
             proc.stdin.close()
 
             proc.wait()
-            self.assertEqual(proc.returncode, 0)
+            self.assertEqual(proc.returncode, 0, self._format_stream(stream_data[proc.stdout], stream_data[proc.stderr]))
 
             for stream, data in reader.drain(0):
                 stream_data[stream] += data
@@ -241,7 +247,7 @@ class SpreadflowTwistdIntegrationTestCase(unittest.TestCase):
                 if marker in stream_data[proc.stderr]:
                     break
             else:
-                self.fail('Worker process is expected to emit a message to stderr')
+                self.fail('Worker process is expected to emit a message to stderr{0}'.format(self._format_stream(stream_data[proc.stdout], stream_data[proc.stderr])))
 
             # Send SIGTERM to controller.
             proc.terminate()
@@ -250,7 +256,7 @@ class SpreadflowTwistdIntegrationTestCase(unittest.TestCase):
                 stream_data[stream] += data
 
             proc.wait()
-            self.assertEqual(proc.returncode, 0)
+            self.assertEqual(proc.returncode, 0, self._format_stream(stream_data[proc.stdout], stream_data[proc.stderr]))
 
             for stream, data in reader.drain(0):
                 stream_data[stream] += data
