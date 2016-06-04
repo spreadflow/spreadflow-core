@@ -128,7 +128,7 @@ class PartitionExpanderPass(object):
 
         # Inherit partition settings by walking down the component tree in
         # topological order.
-        for element in toposort_flatten(graph.digraph(parent_map.items())):
+        for element in toposort_flatten(graph.digraph(parent_map.items()), sort=False):
             try:
                 parent_element = parent_map[element]
                 parent_partition = partition_map[parent_element]
@@ -280,7 +280,7 @@ class ComponentsPurgePass(object):
 
         # Walk the component tree from leaves to roots and collect connected
         # elements on the way down.
-        for child in toposort_flatten(graph.reverse(graph.digraph(parent_map.items()))):
+        for child in toposort_flatten(graph.reverse(graph.digraph(parent_map.items())), sort=False):
             if child in connected_elements and child in parent_map:
                 parent = parent_map[child]
                 connected_elements.add(parent)
