@@ -155,13 +155,13 @@ class SpreadflowTwistdIntegrationTestCase(unittest.TestCase):
                 if stream_data[proc.stdout]:
                     break
             else:
-                self.fail('Worker process is expected to emit a message to stdout{0}'.format(self._format_stream(stream_data[proc.stdout], stream_data[proc.stderr])))
+                self.fail('Worker process is expected to emit a message to stdout{0}'.format(self._format_stream('*** BINARY ***', stream_data[proc.stderr])))
 
             # Close stdin, this signals the worker process to terminate.
             proc.stdin.close()
 
             proc.wait()
-            self.assertEqual(proc.returncode, 0, self._format_stream(stream_data[proc.stdout], stream_data[proc.stderr]))
+            self.assertEqual(proc.returncode, 0, self._format_stream('*** BINARY ***', stream_data[proc.stderr]))
 
             for stream, data in reader.drain(0):
                 stream_data[stream] += data
@@ -203,7 +203,7 @@ class SpreadflowTwistdIntegrationTestCase(unittest.TestCase):
                 if marker in stream_data[proc.stderr]:
                     break
             else:
-                self.fail('Worker process is expected to emit a message to stderr{0}'.format(self._format_stream("*** HIDDEN ***", stream_data[proc.stderr])))
+                self.fail('Worker process is expected to emit a message to stderr{0}'.format(self._format_stream(stream_data[proc.stdout], stream_data[proc.stderr])))
 
             # Close stdin, this signals the worker process to terminate.
             proc.stdin.close()
