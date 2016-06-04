@@ -94,7 +94,7 @@ class SpreadflowTwistdIntegrationTestCase(unittest.TestCase):
 
     def _format_stream(self, stdout, stderr):
         return '\nSTDOUT:\n{0}\nSTDERR:\n{1}'.format(
-            stdout.decode('utf-8') or '*** EMPTY ***', stderr.decode('utf-8') or '*** EMPTY ***')
+            stdout or '*** EMPTY ***', stderr or '*** EMPTY ***')
 
     def test_oneshot(self):
         """
