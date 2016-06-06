@@ -7,8 +7,6 @@ import copy
 from twisted.internet import defer, task
 from twisted.logger import Logger, LogLevel
 
-from spreadflow_core.component import ComponentBase
-
 
 class SyntheticSource(object):
     def __init__(self, items):
@@ -41,7 +39,7 @@ class DebugLog(object):
         send(item, self)
 
 
-class Duplicator(ComponentBase):
+class Duplicator(object):
     """
     A processor capable of sending messages to another flow.
     """
@@ -52,10 +50,6 @@ class Duplicator(ComponentBase):
     def __call__(self, item, send):
         send(copy.deepcopy(item), self.out_duplicate)
         send(item, self)
-
-    @property
-    def outs(self):
-        return [self.out_duplicate, self]
 
 
 class Sleep(object):

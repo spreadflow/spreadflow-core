@@ -16,10 +16,10 @@ from spreadflow_core.dsl.context import Context
 from spreadflow_core.dsl.stream import SetDefaultTokenOp, AddTokenOp
 from spreadflow_core.dsl.tokens import \
     AliasToken, \
-    ComponentToken, \
     ConnectionToken, \
     DescriptionToken, \
     LabelToken, \
+    ParentElementToken, \
     PartitionToken
 from spreadflow_core.script import Chain, Duplicate, Process, ProcessTemplate
 
@@ -51,9 +51,9 @@ class ProcessDecoratorTestCase(unittest.TestCase):
         self.assertIs(process.captured_ctx, outer_ctx)
 
         tokens = outer_ctx.tokens
-        self.assertIn(SetDefaultTokenOp(AliasToken(process, 'TrivialProcess')), tokens)
         self.assertIn(SetDefaultTokenOp(LabelToken(process, 'TrivialProcess')), tokens)
         self.assertIn(SetDefaultTokenOp(DescriptionToken(process, 'Docs for the trivial process.')), tokens)
+        self.assertIn(AddTokenOp(AliasToken(process, 'TrivialProcess')), tokens)
 
     def test_process_def(self):
         """
@@ -77,14 +77,12 @@ class ProcessDecoratorTestCase(unittest.TestCase):
 
         self.assertIsInstance(trivial_proc, Compound)
         self.assertIs(port.captured_ctx, outer_ctx)
-        self.assertListEqual(trivial_proc.ins, [port])
-        self.assertListEqual(trivial_proc.outs, [port])
 
         tokens = outer_ctx.tokens
-        self.assertIn(AddTokenOp(ComponentToken(trivial_proc)), tokens)
         self.assertIn(SetDefaultTokenOp(AliasToken(trivial_proc, 'trivial_proc')), tokens)
         self.assertIn(SetDefaultTokenOp(LabelToken(trivial_proc, 'trivial_proc')), tokens)
         self.assertIn(SetDefaultTokenOp(DescriptionToken(trivial_proc, 'Docs for another trivial process.')), tokens)
+        self.assertIn(AddTokenOp(ParentElementToken(port, trivial_proc)), tokens)
 
     def test_process_port_chain(self):
         """
@@ -102,11 +100,11 @@ class ProcessDecoratorTestCase(unittest.TestCase):
                 yield port2
                 yield port3
 
-        self.assertListEqual(proc_chain.ins, [port1, port2, port3])
-        self.assertListEqual(proc_chain.outs, [port1, port2, port3])
-
         self.assertIn(AddTokenOp(ConnectionToken(port1, port2)), ctx.tokens)
         self.assertIn(AddTokenOp(ConnectionToken(port2, port3)), ctx.tokens)
+        self.assertIn(AddTokenOp(ParentElementToken(port1, proc_chain)), ctx.tokens)
+        self.assertIn(AddTokenOp(ParentElementToken(port2, proc_chain)), ctx.tokens)
+        self.assertIn(AddTokenOp(ParentElementToken(port3, proc_chain)), ctx.tokens)
 
     def test_process_params(self):
         """
@@ -167,11 +165,7 @@ class LegacyScriptTestCase(unittest.TestCase):
             process = Chain('legacy_chain', port1, port2, port3,
                             description='some legacy chain', partition='legacy')
 
-        self.assertListEqual(process.ins, [port1, port2, port3])
-        self.assertListEqual(process.outs, [port1, port2, port3])
-
         tokens = ctx.tokens
-        self.assertIn(AddTokenOp(ComponentToken(process)), tokens)
         self.assertIn(AddTokenOp(AliasToken(process, 'legacy_chain')), tokens)
         self.assertIn(AddTokenOp(LabelToken(process, 'legacy_chain')), tokens)
         self.assertIn(AddTokenOp(DescriptionToken(process, 'some legacy chain')), tokens)
@@ -179,10 +173,13 @@ class LegacyScriptTestCase(unittest.TestCase):
 
         self.assertIn(AddTokenOp(ConnectionToken(port1, port2)), tokens)
         self.assertIn(AddTokenOp(ConnectionToken(port2, port3)), tokens)
+        self.assertIn(AddTokenOp(ParentElementToken(port1, process)), tokens)
+        self.assertIn(AddTokenOp(ParentElementToken(port2, process)), tokens)
+        self.assertIn(AddTokenOp(ParentElementToken(port3, process)), tokens)
 
     def test_legacy_duplicate(self):
         with Context(self) as ctx:
             process = Duplicate('other chain')
 
-        self.assertIn(AddTokenOp(ComponentToken(process)), ctx.tokens)
         self.assertIn(AddTokenOp(ConnectionToken(process.out_duplicate, 'other chain')), ctx.tokens)
+        self.assertIn(AddTokenOp(ParentElementToken(process.out_duplicate, process)), ctx.tokens)
