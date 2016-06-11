@@ -45,11 +45,11 @@ class HandlerError(Exception):
 
     def __repr__(self):
         return 'HandlerError[{:s}, {:s}]'.format(
-            self.handler, self.wrapped_failure.value)
+            str(self.handler), str(self.wrapped_failure.value))
 
     def __str__(self):
         return 'HandlerError[{:s}, {:s}]'.format(
-            self.handler, self.wrapped_failure)
+            str(self.handler), str(self.wrapped_failure))
 
 class EventDispatcher(object):
     """ Event dispatcher.
