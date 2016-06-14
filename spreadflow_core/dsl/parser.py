@@ -15,6 +15,7 @@ from toposort import toposort_flatten
 from spreadflow_core import scheduler, graph
 from spreadflow_core.dsl.stream import \
     AddTokenOp, \
+    SetDefaultTokenOp, \
     stream_divert, \
     stream_extract, \
     token_attr_map
@@ -24,6 +25,7 @@ from spreadflow_core.dsl.tokens import \
     DefaultInputToken, \
     DefaultOutputToken, \
     EventHandlerToken, \
+    LabelToken, \
     ParentElementToken, \
     PartitionBoundsToken, \
     PartitionSelectToken, \
@@ -246,6 +248,8 @@ class PartitionControllersPass(object):
             innames = list(range(len(bounds.ins)))
             outnames = list(range(len(bounds.outs)))
             controller = SubprocessController(partition_name, innames=innames, outnames=outnames)
+            yield SetDefaultTokenOp(LabelToken(controller, "Subprocess {:s}".format(partition_name)))
+
             for port in controller.ins + controller.outs:
                 yield AddTokenOp(ParentElementToken(port, controller))
 
