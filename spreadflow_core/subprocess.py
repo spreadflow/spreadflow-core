@@ -38,7 +38,7 @@ class SubprocessWorker(ServerEndpointMixin):
 
     @property
     def outs(self):
-        return [self._outs[name] for name in reversed(self._outnames)]
+        return [self._outs[name] for name in self._outnames]
 
     def get_server_protocol_factory(self, scheduler, reactor):
         handler = MessageHandler(scheduler, self._outs)
@@ -75,7 +75,7 @@ class SubprocessController(ClientEndpointMixin):
 
     @property
     def outs(self):
-        return [self._outs[name] for name in reversed(self._outnames)]
+        return [self._outs[name] for name in self._outnames]
 
     def get_client_protocol_factory(self, scheduler, reactor):
         handler = MessageHandler(scheduler, self._outs)
