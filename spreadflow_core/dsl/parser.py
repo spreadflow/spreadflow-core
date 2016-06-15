@@ -237,17 +237,12 @@ class PartitionControllersPass(object):
 
         # Generate partition map.
         partition_map = token_attr_map(partition_ops, 'element', 'partition')
-        partitions_elements = {}
-        for element, partition in partition_map.items():
-            partitions_elements.setdefault(partition, set()).add(element)
 
         # Generate partition bounds map.
         partition_bounds_map = token_attr_map(partition_bounds_ops,
                                               'partition', 'bounds')
 
-        for partition_name, _ in partitions_elements.items():
-            bounds = partition_bounds_map[partition_name]
-
+        for partition_name, bounds in partition_bounds_map.items():
             innames = list(range(len(bounds.ins)))
             outnames = list(range(len(bounds.outs)))
             controller = SubprocessController(partition_name, innames=innames, outnames=outnames)
