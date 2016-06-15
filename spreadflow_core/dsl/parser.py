@@ -234,21 +234,15 @@ class PartitionControllersPass(object):
 
         outmap = dict()
         inmap = dict()
-        inner_ports = set()
 
         # Generate partition map.
         partition_map = token_attr_map(partition_ops, 'element', 'partition')
-        partitions_elements = {}
-        for element, partition in partition_map.items():
-            partitions_elements.setdefault(partition, set()).add(element)
 
         # Generate partition bounds map.
         partition_bounds_map = token_attr_map(partition_bounds_ops,
                                               'partition', 'bounds')
 
-        for partition_name, partition_elements in partitions_elements.items():
-            bounds = partition_bounds_map[partition_name]
-
+        for partition_name, bounds in partition_bounds_map.items():
             innames = list(range(len(bounds.ins)))
             outnames = list(range(len(bounds.outs)))
             controller = SubprocessController(partition_name, innames=innames, outnames=outnames)
@@ -257,13 +251,16 @@ class PartitionControllersPass(object):
 
             outmap.update(zip(bounds.outs, controller.outs))
             inmap.update(zip(bounds.ins, controller.ins))
-            inner_ports.update(partition_elements)
 
         # Purge/rewire connections.
         for port_out, port_in in portmap(connection_ops).items():
-            port_out = outmap.get(port_out, port_out)
-            port_in = inmap.get(port_in, port_in)
-            if port_out not in inner_ports or port_in not in inner_ports:
+            partition_out = partition_map.get(port_out, None)
+            partition_in = partition_map.get(port_in, None)
+            if partition_out is None and partition_in is None:
+                yield AddTokenOp(ConnectionToken(port_out, port_in))
+            elif partition_out != partition_in:
+                port_out = outmap.get(port_out, port_out)
+                port_in = inmap.get(port_in, port_in)
                 yield AddTokenOp(ConnectionToken(port_out, port_in))
 
 class ComponentsPurgePass(object):
