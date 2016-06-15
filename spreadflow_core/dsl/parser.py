@@ -251,13 +251,11 @@ class PartitionControllersPass(object):
             innames = list(range(len(bounds.ins)))
             outnames = list(range(len(bounds.outs)))
             controller = SubprocessController(partition_name, innames=innames, outnames=outnames)
-
             for port in controller.ins + controller.outs:
                 yield AddTokenOp(ParentElementToken(port, controller))
 
             outmap.update(zip(bounds.outs, controller.outs))
             inmap.update(zip(bounds.ins, controller.ins))
-
 
         # Purge/rewire connections.
         for port_out, port_in in portmap(connection_ops).items():
