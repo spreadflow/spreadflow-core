@@ -84,3 +84,38 @@ def token_attr_map(stream, keyattr, valueattr=None):
     extract_key = lambda op: getattr(op.token, keyattr)
     extract_value = lambda op: getattr(op.token, valueattr)
     return token_map(stream, extract_key, extract_value)
+
+class StreamBranch(object):
+    stream = None
+    selected = None
+    rejected = None
+
+    def push(self, stream):
+        """
+        Extracts the matching operations from the given stream.
+
+        Arguments:
+            - stream: A stream consisting of token operations.
+
+        Returns:
+            self
+        """
+
+        # Copy incoming stream.
+        ops = list(stream)
+        self.stream = iter(ops)
+        self.selected = (op for op in ops if self.predicate(op))
+        self.rejected = (op for op in ops if not self.predicate(op))
+        return self
+
+    def predicate(self, operation):
+        """
+        Abstract filter method. Must be implemented in subclass.
+        """
+        raise NotImplementedError()
+
+class TokenClassPredicateMixin(object):
+    token_class = None
+
+    def predicate(self, operation):
+        return isinstance(operation.token, self.token_class)

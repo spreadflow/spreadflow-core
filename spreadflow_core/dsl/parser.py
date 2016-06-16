@@ -16,11 +16,14 @@ from spreadflow_core import scheduler, graph
 from spreadflow_core.dsl.stream import \
     AddTokenOp, \
     SetDefaultTokenOp, \
+    StreamBranch, \
+    TokenClassPredicateMixin, \
     stream_divert, \
     stream_extract, \
     token_attr_map
 from spreadflow_core.dsl.tokens import \
     AliasToken, \
+    ComponentToken, \
     ConnectionToken, \
     DefaultInputToken, \
     DefaultOutputToken, \
@@ -53,6 +56,17 @@ def treenodes(stream):
 
 class ParserError(Exception):
     pass
+
+class ComponentParser(TokenClassPredicateMixin, StreamBranch):
+    token_class = ComponentToken
+
+    def get_component(self):
+        components = list(token_attr_map(self.selected, 'component'))
+
+        if len(components) != 1:
+            raise ParserError('Process template must generate exactly one component token')
+
+        return components[0]
 
 class AliasResolverPass(object):
     def __call__(self, stream):
