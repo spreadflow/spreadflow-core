@@ -26,6 +26,7 @@ class ProcessTemplate(object):
 
 class ChainTemplate(ProcessTemplate):
     chain = None
+    component_parser = ComponentParser()
 
     def __init__(self, chain=None):
         if chain is not None:
@@ -37,9 +38,9 @@ class ChainTemplate(ProcessTemplate):
         # Apply (sub)templates if necessary.
         for element in self.chain:
             if isinstance(element, ProcessTemplate):
-                parser = ComponentParser().push(element.apply())
-                elements.append(parser.get_component())
-                for op in parser.rejected: yield op
+                for operation in self.component_parser.divert(element.apply()):
+                    yield operation
+                elements.append(self.component_parser.get_component())
             else:
                 elements.append(element)
 
@@ -61,6 +62,7 @@ class ChainTemplate(ProcessTemplate):
         yield AddTokenOp(DefaultOutputToken(component, elements[-1]))
 
 class DuplicatorTemplate(ProcessTemplate):
+    component_parser = ComponentParser()
     destination = None
 
     def __init__(self, destination=None):
@@ -71,9 +73,9 @@ class DuplicatorTemplate(ProcessTemplate):
         # Apply (sub)template if necessary.
         destination = self.destination
         if isinstance(destination, ProcessTemplate):
-            parser = ComponentParser().push(destination.apply())
-            destination = parser.get_component()
-            for op in parser.rejected: yield op
+            for operation in self.component_parser.divert(destination.apply()):
+                yield operation
+            destination = self.component_parser.get_component()
 
         process = Duplicator()
         yield AddTokenOp(ComponentToken(process))
@@ -98,6 +100,8 @@ class Process(object):
     Produces a flow process from a template class or chain generator function.
     """
 
+    component_parser = ComponentParser()
+
     def __init__(self, alias=None, label=None, description=None, partition=None):
         self.alias = alias
         self.label = label
@@ -116,9 +120,8 @@ class Process(object):
                                         'subclasses of ProcessTemplate or '
                                         'functions')
 
-        parser = ComponentParser().push(template.apply())
-        process = parser.get_component()
-        operations = list(parser.rejected)
+        operations = list(self.component_parser.divert(template.apply()))
+        process = self.component_parser.get_component()
 
         operations.append(SetDefaultTokenOp(AliasToken(process, template_factory.__name__)))
         operations.append(SetDefaultTokenOp(DescriptionToken(process, inspect.cleandoc(template_factory.__doc__ or ''))))
@@ -146,9 +149,9 @@ def Chain(name, *procs, **kw): # pylint: disable=C0103
     ctx = Context.top()
     template = ChainTemplate(chain=procs)
 
-    parser = ComponentParser().push(template.apply())
+    parser = ComponentParser()
+    operations = list(parser.divert(template.apply()))
     process = parser.get_component()
-    operations = list(parser.rejected)
 
     operations.append(AddTokenOp(LabelToken(process, name)))
     operations.append(AddTokenOp(AliasToken(process, name)))
@@ -171,9 +174,9 @@ def Duplicate(port_in, **kw): # pylint: disable=C0103
     ctx = Context.top()
     template = DuplicatorTemplate(destination=port_in)
 
-    parser = ComponentParser().push(template.apply())
+    parser = ComponentParser()
+    operations = list(parser.divert(template.apply()))
     process = parser.get_component()
-    operations = list(parser.rejected)
 
     if 'alias' in kw:
         operations.append(AddTokenOp(AliasToken(process, kw['alias'])))
