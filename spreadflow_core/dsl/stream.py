@@ -86,44 +86,48 @@ def token_attr_map(stream, keyattr, valueattr=None):
     return token_map(stream, extract_key, extract_value)
 
 class StreamBranch(object):
-    stream = None
+    """
+    Abstract base class for parsers operating on selected tokens.
+    """
+
+    original = None
     selected = None
     rejected = None
 
-    def push(self, stream):
+    def consume(self, stream):
         """
-        Extracts the matching operations from the given stream.
+        Divides a stream into `selected` and `rejected` substreams.
 
         Arguments:
             - stream: A stream consisting of token operations.
-
-        Returns:
-            self
         """
 
         # Copy incoming stream.
         ops = list(stream)
-        self.stream = iter(ops)
+        self.original = iter(ops)
         self.selected = (op for op in ops if self.predicate(op))
         self.rejected = (op for op in ops if not self.predicate(op))
-        return self
 
     def extract(self, stream):
-        self.push(stream)
-        return self.stream
+        """
+        Processes a stream and returns an iterator over all operations.
+        """
+        self.consume(stream)
+        return self.original
 
     def divert(self, stream):
-        self.push(stream)
+        """
+        Processes a stream and returns an iterator over rejected operations.
+        """
+        self.consume(stream)
         return self.rejected
 
     def predicate(self, operation):
         """
         Abstract filter method. Must be implemented in subclass.
+
+        Returns:
+            bool: True if the operation should be added to the selected stream,
+            False if it should be added to the rejected stream.
         """
         raise NotImplementedError()
-
-class TokenClassPredicateMixin(object):
-    token_class = None
-
-    def predicate(self, operation):
-        return isinstance(operation.token, self.token_class)

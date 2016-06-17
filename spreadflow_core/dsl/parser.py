@@ -17,7 +17,6 @@ from spreadflow_core.dsl.stream import \
     AddTokenOp, \
     SetDefaultTokenOp, \
     StreamBranch, \
-    TokenClassPredicateMixin, \
     token_attr_map, \
     token_map
 from spreadflow_core.dsl.tokens import \
@@ -56,16 +55,32 @@ def treenodes(stream):
 class ParserError(Exception):
     pass
 
-class AliasParser(TokenClassPredicateMixin, StreamBranch):
-    token_class = AliasToken
+class AliasParser(StreamBranch):
+    """
+    Builds an alias map from stream of operations.
+    """
+
+    def predicate(self, operation):
+        return isinstance(operation.token, AliasToken)
 
     def get_aliasmap(self):
+        """
+        Returns a map alias -> element
+        """
         return token_attr_map(self.selected, 'alias', 'element')
 
-class ComponentParser(TokenClassPredicateMixin, StreamBranch):
-    token_class = ComponentToken
+class ComponentParser(StreamBranch):
+    """
+    Extracts exactly one component from a stream of operations.
+    """
+
+    def predicate(self, operation):
+        return isinstance(operation.token, ComponentToken)
 
     def get_component(self):
+        """
+        Returns the component.
+        """
         components = list(token_attr_map(self.selected, 'component'))
 
         if len(components) != 1:
@@ -73,44 +88,93 @@ class ComponentParser(TokenClassPredicateMixin, StreamBranch):
 
         return components[0]
 
-class ConnectionParser(TokenClassPredicateMixin, StreamBranch):
-    token_class = ConnectionToken
+class ConnectionParser(StreamBranch):
+    """
+    Extracts information about connected ports from a stream of operations.
+    """
+
+    def predicate(self, operation):
+        return isinstance(operation.token, ConnectionToken)
 
     def get_portmap(self):
+        """
+        Returns a map output -> input
+        """
         return token_attr_map(self.selected, 'port_out', 'port_in')
 
     def get_links(self):
+        """
+        Returns an iterator over output, input pairs
+        """
         return self.get_portmap().items()
 
     def get_portset(self):
+        """
+        Returns a set containing all ports.
+        """
         all_connections = self.get_links()
         return set(itertools.chain(*zip(*all_connections)))
 
-class DefaultInputParser(TokenClassPredicateMixin, StreamBranch):
-    token_class = DefaultInputToken
+class DefaultInputParser(StreamBranch):
+    """
+    Builds map of default inputs from a stream of operations.
+    """
+
+    def predicate(self, operation):
+        return isinstance(operation.token, DefaultInputToken)
 
     def get_portmap(self):
+        """
+        Returns a map element -> port
+        """
         return token_attr_map(self.selected, 'element', 'port')
 
-class DefaultOutputParser(TokenClassPredicateMixin, StreamBranch):
-    token_class = DefaultOutputToken
+class DefaultOutputParser(StreamBranch):
+    """
+    Builds map of default outputs from a stream of operations.
+    """
+
+    def predicate(self, operation):
+        return isinstance(operation.token, DefaultOutputToken)
 
     def get_portmap(self):
+        """
+        Returns a map element -> port
+        """
         return token_attr_map(self.selected, 'element', 'port')
 
-class EventHandlerParser(TokenClassPredicateMixin, StreamBranch):
-    token_class = EventHandlerToken
+class EventHandlerParser(StreamBranch):
+    """
+    Extracts a list of event handlers from a stream of operations.
+    """
+
+    def predicate(self, operation):
+        return isinstance(operation.token, EventHandlerToken)
 
     def get_handlers(self):
-        return token_map(self.selected)
+        """
+        Returns an iterator over event handler tokens.
+        """
+        return token_map(self.selected).values()
 
-class ParentParser(TokenClassPredicateMixin, StreamBranch):
-    token_class = ParentElementToken
+class ParentParser(StreamBranch):
+    """
+    Extracts information about component hierarchy from a stream of operations.
+    """
+
+    def predicate(self, operation):
+        return isinstance(operation.token, ParentElementToken)
 
     def get_parentmap(self):
+        """
+        Returns a map element -> parent.
+        """
         return token_attr_map(self.selected, 'element', 'parent')
 
     def get_parentmap_toposort(self, reverse=False):
+        """
+        Returns an iterator in topological order over element, parent pairs.
+        """
         parent_map = self.get_parentmap()
 
         digraph = graph.digraph(parent_map.items())
@@ -121,25 +185,52 @@ class ParentParser(TokenClassPredicateMixin, StreamBranch):
             yield element, parent_map.get(element, None)
 
     def get_nodeset(self):
+        """
+        Returns a set containing all elements.
+        """
         all_nodes = self.get_parentmap().items()
         return set(itertools.chain(*zip(*all_nodes)))
 
-class PartitionBoundsParser(TokenClassPredicateMixin, StreamBranch):
-    token_class = PartitionBoundsToken
+class PartitionBoundsParser(StreamBranch):
+    """
+    Builds map of partition bounds from a stream of operations.
+    """
+
+    def predicate(self, operation):
+        return isinstance(operation.token, PartitionBoundsToken)
 
     def get_partition_bounds(self):
+        """
+        Returns a map partition name -> bounds
+        """
         return token_attr_map(self.selected, 'partition', 'bounds')
 
-class PartitionParser(TokenClassPredicateMixin, StreamBranch):
-    token_class = PartitionToken
+class PartitionParser(StreamBranch):
+    """
+    Builds map of partitions from a stream of operations.
+    """
+
+    def predicate(self, operation):
+        return isinstance(operation.token, PartitionToken)
 
     def get_partitionmap(self):
+        """
+        Returns a map element -> partition name
+        """
         return token_attr_map(self.selected, 'element', 'partition')
 
-class PartitionSelectParser(TokenClassPredicateMixin, StreamBranch):
-    token_class = PartitionSelectToken
+class PartitionSelectParser(StreamBranch):
+    """
+    Extracts the selected partition from a stream of operations.
+    """
+
+    def predicate(self, operation):
+        return isinstance(operation.token, PartitionSelectToken)
 
     def get_selected_partition(self):
+        """
+        Returns the name of the selected partition.
+        """
         partition_select_tokens = list(token_attr_map(self.selected, 'partition'))
 
         if len(partition_select_tokens) != 1:
