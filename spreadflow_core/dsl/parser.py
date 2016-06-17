@@ -136,12 +136,6 @@ class PartitionParser(TokenClassPredicateMixin, StreamBranch):
     def get_partitionmap(self):
         return token_attr_map(self.selected, 'element', 'partition')
 
-    def get_reversed(self):
-        result = {}
-        for element, partition in self.get_partitionmap().items():
-            result.setdefault(partition, set()).add(element)
-        return result
-
 class PartitionSelectParser(TokenClassPredicateMixin, StreamBranch):
     token_class = PartitionSelectToken
 
@@ -297,8 +291,8 @@ class PartitionWorkerPass(object):
 
         selected_partition = self.partition_select_parser.get_selected_partition()
 
-        partitions_elements = self.partition_parser.get_reversed()
-        inner_ports = partitions_elements[selected_partition]
+        partition_map = self.partition_parser.get_partitionmap()
+        partition_elements = set(elm for elm, part in partition_map.items() if part == selected_partition)
 
         partition_bounds_map = self.partition_bounds_parser.get_partition_bounds()
         bounds = partition_bounds_map[selected_partition]
@@ -316,11 +310,11 @@ class PartitionWorkerPass(object):
 
         emitted_tokens = set()
         for port_out, port_in in self.connection_parser.get_links():
-            if port_out in inner_ports and port_in in inner_ports:
+            if port_out in partition_elements and port_in in partition_elements:
                 yield AddTokenOp(ConnectionToken(port_out, port_in))
-            elif port_out in inner_ports:
+            elif port_out in partition_elements:
                 yield AddTokenOp(ConnectionToken(port_out, outmap[port_out]))
-            elif port_in in inner_ports:
+            elif port_in in partition_elements:
                 # A workers output port potentially replaces multiple outputs
                 # outside the partition. Hence it is necessary to guard against
                 # adding duplicate connections here.
