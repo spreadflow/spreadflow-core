@@ -26,10 +26,7 @@ from spreadflow_core.dsl.parser import \
     PartitionWorkerPass, \
     PortsValidatorPass
 from spreadflow_core.dsl.stream import AddTokenOp
-from spreadflow_core.dsl.tokens import \
-    ConnectionToken, \
-    EventHandlerToken, \
-    PartitionSelectToken
+from spreadflow_core.dsl.tokens import PartitionSelectToken
 
 class Options(usage.Options):
     optFlags = [
