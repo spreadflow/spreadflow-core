@@ -18,7 +18,8 @@ from spreadflow_core.dsl.stream import \
     SetDefaultTokenOp, \
     StreamBranch, \
     TokenClassPredicateMixin, \
-    token_attr_map
+    token_attr_map, \
+    token_map
 from spreadflow_core.dsl.tokens import \
     AliasToken, \
     ComponentToken, \
@@ -96,6 +97,12 @@ class DefaultOutputParser(TokenClassPredicateMixin, StreamBranch):
 
     def get_portmap(self):
         return token_attr_map(self.selected, 'element', 'port')
+
+class EventHandlerParser(TokenClassPredicateMixin, StreamBranch):
+    token_class = EventHandlerToken
+
+    def get_handlers(self):
+        return token_map(self.selected)
 
 class ParentParser(TokenClassPredicateMixin, StreamBranch):
     token_class = ParentElementToken
