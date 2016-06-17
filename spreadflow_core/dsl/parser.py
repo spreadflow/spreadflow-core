@@ -39,20 +39,6 @@ try:
 except NameError:
     StringType = str
 
-def portmap(stream):
-    return token_attr_map(stream, 'port_out', 'port_in')
-
-def ports(stream):
-    all_connections = portmap(stream).items()
-    return itertools.chain(*zip(*all_connections))
-
-def parentmap(stream):
-    return token_attr_map(stream, 'element', 'parent')
-
-def treenodes(stream):
-    all_nodes = parentmap(stream).items()
-    return itertools.chain(*zip(*all_nodes))
-
 class ParserError(Exception):
     pass
 

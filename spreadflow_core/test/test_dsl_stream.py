@@ -17,12 +17,11 @@ from spreadflow_core.dsl.stream import \
     NoSuchTokenError, \
     RemoveTokenOp, \
     SetDefaultTokenOp, \
-    stream_divert, \
-    stream_extract, \
+    StreamBranch, \
     token_attr_map, \
     token_map
 
-class StreamTestCase(unittest.TestCase):
+class StreamBranchTestCase(unittest.TestCase):
     """
     Unit tests for stream manipulation functions.
     """
@@ -37,6 +36,10 @@ class StreamTestCase(unittest.TestCase):
         class T2(object):
             pass
 
+        class Parser(StreamBranch):
+            def predicate(self, operation):
+                return isinstance(operation.token, T1)
+
         tokens = [
             SetDefaultTokenOp(T1()),
             SetDefaultTokenOp(T2()),
@@ -46,8 +49,10 @@ class StreamTestCase(unittest.TestCase):
             RemoveTokenOp(T2()),
         ]
 
+        parser = Parser()
+
         stream = iter(tokens)
-        t1_stream, orig_stream = stream_extract(stream, T1)
+        result_stream = parser.extract(stream)
 
         expected_t1_tokens = [
             tokens[0],
@@ -55,8 +60,8 @@ class StreamTestCase(unittest.TestCase):
             tokens[4]
         ]
 
-        self.assertListEqual(list(t1_stream), expected_t1_tokens)
-        self.assertListEqual(list(orig_stream), tokens)
+        self.assertListEqual(list(parser.selected), expected_t1_tokens)
+        self.assertListEqual(list(result_stream), tokens)
 
     def test_stream_divert(self):
         """
@@ -68,6 +73,10 @@ class StreamTestCase(unittest.TestCase):
         class T2(object):
             pass
 
+        class Parser(StreamBranch):
+            def predicate(self, operation):
+                return isinstance(operation.token, T1)
+
         tokens = [
             SetDefaultTokenOp(T1()),
             SetDefaultTokenOp(T2()),
@@ -77,8 +86,10 @@ class StreamTestCase(unittest.TestCase):
             RemoveTokenOp(T2()),
         ]
 
+        parser = Parser()
+
         stream = iter(tokens)
-        t1_stream, remaining_stream = stream_divert(stream, T1)
+        result_stream = parser.divert(stream)
 
         expected_t1_tokens = [
             tokens[0],
@@ -86,14 +97,14 @@ class StreamTestCase(unittest.TestCase):
             tokens[4]
         ]
 
-        expected_remaining_tokens = [
+        expected_rejected_tokens = [
             tokens[1],
             tokens[3],
             tokens[5]
         ]
 
-        self.assertListEqual(list(t1_stream), expected_t1_tokens)
-        self.assertListEqual(list(remaining_stream), expected_remaining_tokens)
+        self.assertListEqual(list(parser.selected), expected_t1_tokens)
+        self.assertListEqual(list(result_stream), expected_rejected_tokens)
 
 class TokenMapTestCase(unittest.TestCase):
     """

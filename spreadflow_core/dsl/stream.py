@@ -29,23 +29,6 @@ AddTokenOp = namedtuple('AddTokenOp', ['token'])
 SetDefaultTokenOp = namedtuple('SetDefaultTokenOp', ['token'])
 RemoveTokenOp = namedtuple('RemoveTokenOp', ['token'])
 
-def stream_extract(stream, token_class):
-    """
-    Copy all operations addressing tokens of the given class.
-    """
-    ops = list(stream)
-    extracted_stream = (op for op in ops if isinstance(op.token, token_class))
-    return extracted_stream, ops
-
-def stream_divert(stream, token_class):
-    """
-    Remove all operations addressing tokens of the given class from the stream.
-    """
-    ops = list(stream)
-    extracted_stream = (op for op in ops if isinstance(op.token, token_class))
-    remaining_stream = (op for op in ops if not isinstance(op.token, token_class))
-    return extracted_stream, remaining_stream
-
 def token_map(stream, keyfunc=lambda op: op.token, valuefunc=lambda op: op.token):
     """
     Apply all token operations in order and construct a mapping.
