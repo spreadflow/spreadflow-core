@@ -25,6 +25,7 @@ from spreadflow_core.dsl.tokens import \
     ConnectionToken, \
     DefaultInputToken, \
     DefaultOutputToken, \
+    DescriptionToken, \
     EventHandlerToken, \
     LabelToken, \
     ParentElementToken, \
@@ -143,6 +144,20 @@ class DefaultOutputParser(StreamBranch):
         """
         return token_attr_map(self.selected, 'element', 'port')
 
+class DescriptionParser(StreamBranch):
+    """
+    Builds map of descriptions from a stream of operations.
+    """
+
+    def predicate(self, operation):
+        return isinstance(operation.token, DescriptionToken)
+
+    def get_descriptionmap(self):
+        """
+        Returns a map element -> description
+        """
+        return token_attr_map(self.selected, 'element', 'description')
+
 class EventHandlerParser(StreamBranch):
     """
     Extracts a list of event handlers from a stream of operations.
@@ -156,6 +171,20 @@ class EventHandlerParser(StreamBranch):
         Returns an iterator over event handler tokens.
         """
         return token_map(self.selected).values()
+
+class LabelParser(StreamBranch):
+    """
+    Builds map of labels from a stream of operations.
+    """
+
+    def predicate(self, operation):
+        return isinstance(operation.token, LabelToken)
+
+    def get_labelmap(self):
+        """
+        Returns a map element -> label
+        """
+        return token_attr_map(self.selected, 'element', 'label')
 
 class ParentParser(StreamBranch):
     """
