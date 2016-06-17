@@ -12,16 +12,16 @@ from __future__ import unicode_literals
 import unittest
 
 from spreadflow_core.component import Compound
-from spreadflow_core.dsl.context import Context
 from spreadflow_core.dsl.stream import SetDefaultTokenOp, AddTokenOp
 from spreadflow_core.dsl.tokens import \
     AliasToken, \
+    ComponentToken, \
     ConnectionToken, \
     DescriptionToken, \
     LabelToken, \
     ParentElementToken, \
     PartitionToken
-from spreadflow_core.script import Chain, Duplicate, Process, ProcessTemplate
+from spreadflow_core.script import Chain, Context, Duplicate, Process, ProcessTemplate
 
 class ProcessDecoratorTestCase(unittest.TestCase):
     """
@@ -32,25 +32,20 @@ class ProcessDecoratorTestCase(unittest.TestCase):
         """
         Process decorator replaces class definition with instantiated process.
         """
-        class MyProcess(object):
-            captured_ctx = None
+        process = object()
 
-        process = MyProcess()
-
-        with Context(self) as outer_ctx:
+        with Context(self) as ctx:
             @Process()
             class TrivialProcess(ProcessTemplate):
                 """
                 Docs for the trivial process.
                 """
-                def apply(self, inner_ctx):
-                    process.captured_ctx = inner_ctx
-                    return process
+                def apply(self):
+                    yield AddTokenOp(ComponentToken(process))
 
         self.assertIs(TrivialProcess, process)
-        self.assertIs(process.captured_ctx, outer_ctx)
 
-        tokens = outer_ctx.tokens
+        tokens = ctx.tokens
         self.assertIn(SetDefaultTokenOp(LabelToken(process, 'TrivialProcess')), tokens)
         self.assertIn(SetDefaultTokenOp(DescriptionToken(process, 'Docs for the trivial process.')), tokens)
         self.assertIn(AddTokenOp(AliasToken(process, 'TrivialProcess')), tokens)
@@ -60,25 +55,20 @@ class ProcessDecoratorTestCase(unittest.TestCase):
         Process decorator replaces function definition with compound.
         """
 
-        class MyPort(object):
-            captured_ctx = None
+        port = object()
 
-        port = MyPort()
-
-        with Context(self) as outer_ctx:
+        with Context(self) as ctx:
             @Process()
-            def trivial_proc(inner_ctx):
+            def trivial_proc():
                 """
                 Docs for another trivial process.
                 """
-                port.captured_ctx = inner_ctx
                 yield port
 
 
         self.assertIsInstance(trivial_proc, Compound)
-        self.assertIs(port.captured_ctx, outer_ctx)
 
-        tokens = outer_ctx.tokens
+        tokens = ctx.tokens
         self.assertIn(SetDefaultTokenOp(AliasToken(trivial_proc, 'trivial_proc')), tokens)
         self.assertIn(SetDefaultTokenOp(LabelToken(trivial_proc, 'trivial_proc')), tokens)
         self.assertIn(SetDefaultTokenOp(DescriptionToken(trivial_proc, 'Docs for another trivial process.')), tokens)
@@ -95,7 +85,7 @@ class ProcessDecoratorTestCase(unittest.TestCase):
 
         with Context(self) as ctx:
             @Process()
-            def proc_chain(inner_ctx):
+            def proc_chain():
                 yield port1
                 yield port2
                 yield port3
@@ -119,8 +109,8 @@ class ProcessDecoratorTestCase(unittest.TestCase):
                 """
                 Docs for the trivial process.
                 """
-                def apply(self, ctx):
-                    return process
+                def apply(self):
+                    yield AddTokenOp(ComponentToken(process))
 
         tokens = ctx.tokens
         self.assertIn(AddTokenOp(AliasToken(process, 'trivproc')), tokens)
@@ -145,9 +135,9 @@ class ProcessDecoratorTestCase(unittest.TestCase):
                 """
                 Docs for the trivial process.
                 """
-                def apply(self, ctx):
-                    ctx.add(token)
-                    return process
+                def apply(self):
+                    yield AddTokenOp(token)
+                    yield AddTokenOp(ComponentToken(process))
 
         self.assertIn(AddTokenOp(token), ctx.tokens)
 

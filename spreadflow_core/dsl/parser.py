@@ -16,14 +16,16 @@ from spreadflow_core import scheduler, graph
 from spreadflow_core.dsl.stream import \
     AddTokenOp, \
     SetDefaultTokenOp, \
-    stream_divert, \
-    stream_extract, \
-    token_attr_map
+    StreamBranch, \
+    token_attr_map, \
+    token_map
 from spreadflow_core.dsl.tokens import \
     AliasToken, \
+    ComponentToken, \
     ConnectionToken, \
     DefaultInputToken, \
     DefaultOutputToken, \
+    DescriptionToken, \
     EventHandlerToken, \
     LabelToken, \
     ParentElementToken, \
@@ -37,39 +39,241 @@ try:
 except NameError:
     StringType = str
 
-def portmap(stream):
-    return token_attr_map(stream, 'port_out', 'port_in')
-
-def ports(stream):
-    all_connections = portmap(stream).items()
-    return itertools.chain(*zip(*all_connections))
-
-def parentmap(stream):
-    return token_attr_map(stream, 'element', 'parent')
-
-def treenodes(stream):
-    all_nodes = parentmap(stream).items()
-    return itertools.chain(*zip(*all_nodes))
-
 class ParserError(Exception):
     pass
 
+class AliasParser(StreamBranch):
+    """
+    Builds an alias map from stream of operations.
+    """
+
+    def predicate(self, operation):
+        return isinstance(operation.token, AliasToken)
+
+    def get_aliasmap(self):
+        """
+        Returns a map alias -> element
+        """
+        return token_attr_map(self.selected, 'alias', 'element')
+
+class ComponentParser(StreamBranch):
+    """
+    Extracts exactly one component from a stream of operations.
+    """
+
+    def predicate(self, operation):
+        return isinstance(operation.token, ComponentToken)
+
+    def get_component(self):
+        """
+        Returns the component.
+        """
+        components = list(token_attr_map(self.selected, 'component'))
+
+        if len(components) != 1:
+            raise ParserError('Process template must generate exactly one component token')
+
+        return components[0]
+
+class ConnectionParser(StreamBranch):
+    """
+    Extracts information about connected ports from a stream of operations.
+    """
+
+    def predicate(self, operation):
+        return isinstance(operation.token, ConnectionToken)
+
+    def get_portmap(self):
+        """
+        Returns a map output -> input
+        """
+        return token_attr_map(self.selected, 'port_out', 'port_in')
+
+    def get_links(self):
+        """
+        Returns an iterator over output, input pairs
+        """
+        return self.get_portmap().items()
+
+    def get_portset(self):
+        """
+        Returns a set containing all ports.
+        """
+        all_connections = self.get_links()
+        return set(itertools.chain(*zip(*all_connections)))
+
+class DefaultInputParser(StreamBranch):
+    """
+    Builds map of default inputs from a stream of operations.
+    """
+
+    def predicate(self, operation):
+        return isinstance(operation.token, DefaultInputToken)
+
+    def get_portmap(self):
+        """
+        Returns a map element -> port
+        """
+        return token_attr_map(self.selected, 'element', 'port')
+
+class DefaultOutputParser(StreamBranch):
+    """
+    Builds map of default outputs from a stream of operations.
+    """
+
+    def predicate(self, operation):
+        return isinstance(operation.token, DefaultOutputToken)
+
+    def get_portmap(self):
+        """
+        Returns a map element -> port
+        """
+        return token_attr_map(self.selected, 'element', 'port')
+
+class DescriptionParser(StreamBranch):
+    """
+    Builds map of descriptions from a stream of operations.
+    """
+
+    def predicate(self, operation):
+        return isinstance(operation.token, DescriptionToken)
+
+    def get_descriptionmap(self):
+        """
+        Returns a map element -> description
+        """
+        return token_attr_map(self.selected, 'element', 'description')
+
+class EventHandlerParser(StreamBranch):
+    """
+    Extracts a list of event handlers from a stream of operations.
+    """
+
+    def predicate(self, operation):
+        return isinstance(operation.token, EventHandlerToken)
+
+    def get_handlers(self):
+        """
+        Returns an iterator over event handler tokens.
+        """
+        return token_map(self.selected).values()
+
+class LabelParser(StreamBranch):
+    """
+    Builds map of labels from a stream of operations.
+    """
+
+    def predicate(self, operation):
+        return isinstance(operation.token, LabelToken)
+
+    def get_labelmap(self):
+        """
+        Returns a map element -> label
+        """
+        return token_attr_map(self.selected, 'element', 'label')
+
+class ParentParser(StreamBranch):
+    """
+    Extracts information about component hierarchy from a stream of operations.
+    """
+
+    def predicate(self, operation):
+        return isinstance(operation.token, ParentElementToken)
+
+    def get_parentmap(self):
+        """
+        Returns a map element -> parent.
+        """
+        return token_attr_map(self.selected, 'element', 'parent')
+
+    def get_parentmap_toposort(self, reverse=False):
+        """
+        Returns an iterator in topological order over element, parent pairs.
+        """
+        parent_map = self.get_parentmap()
+
+        digraph = graph.digraph(parent_map.items())
+        if reverse:
+            digraph = graph.reverse(digraph)
+
+        for element in toposort_flatten(digraph, sort=False):
+            yield element, parent_map.get(element, None)
+
+    def get_nodeset(self):
+        """
+        Returns a set containing all elements.
+        """
+        all_nodes = self.get_parentmap().items()
+        return set(itertools.chain(*zip(*all_nodes)))
+
+class PartitionBoundsParser(StreamBranch):
+    """
+    Builds map of partition bounds from a stream of operations.
+    """
+
+    def predicate(self, operation):
+        return isinstance(operation.token, PartitionBoundsToken)
+
+    def get_partition_bounds(self):
+        """
+        Returns a map partition name -> bounds
+        """
+        return token_attr_map(self.selected, 'partition', 'bounds')
+
+class PartitionParser(StreamBranch):
+    """
+    Builds map of partitions from a stream of operations.
+    """
+
+    def predicate(self, operation):
+        return isinstance(operation.token, PartitionToken)
+
+    def get_partitionmap(self):
+        """
+        Returns a map element -> partition name
+        """
+        return token_attr_map(self.selected, 'element', 'partition')
+
+class PartitionSelectParser(StreamBranch):
+    """
+    Extracts the selected partition from a stream of operations.
+    """
+
+    def predicate(self, operation):
+        return isinstance(operation.token, PartitionSelectToken)
+
+    def get_selected_partition(self):
+        """
+        Returns the name of the selected partition.
+        """
+        partition_select_tokens = list(token_attr_map(self.selected, 'partition'))
+
+        if len(partition_select_tokens) != 1:
+            raise ParserError('Exactly one partition must be selected')
+
+        return partition_select_tokens[0]
+
 class AliasResolverPass(object):
+    alias_parser = AliasParser()
+    connection_parser = ConnectionParser()
+    default_ins_parser = DefaultInputParser()
+    default_outs_parser = DefaultOutputParser()
+
     def __call__(self, stream):
-        # Capture aliases and connections, yield all the rest
-        alias_ops, stream = stream_divert(stream, AliasToken)
-        connection_ops, stream = stream_divert(stream, ConnectionToken)
-        default_in_ops, stream = stream_divert(stream, DefaultInputToken)
-        default_out_ops, stream = stream_divert(stream, DefaultOutputToken)
+        # Capture aliases, connections, default ins/outs and yield all the rest
+        stream = self.alias_parser.divert(stream)
+        stream = self.connection_parser.divert(stream)
+        stream = self.default_ins_parser.divert(stream)
+        stream = self.default_outs_parser.divert(stream)
         for op in stream: yield op
 
         # Generate alias map.
-        aliases = token_attr_map(alias_ops, 'alias', 'element')
-        default_inputs = token_attr_map(default_in_ops, 'element', 'port')
-        default_outputs = token_attr_map(default_out_ops, 'element', 'port')
+        aliases = self.alias_parser.get_aliasmap()
+        default_inputs = self.default_ins_parser.get_portmap()
+        default_outputs = self.default_outs_parser.get_portmap()
 
         # Generate connection operations.
-        for port_out, port_in in portmap(connection_ops).items():
+        for port_out, port_in in self.connection_parser.get_links():
             while True:
                 if isinstance(port_out, StringType):
                     port_out = aliases[port_out]
@@ -93,10 +297,11 @@ class PortsValidatorPass(object):
     Verifies used input/output ports.
     """
 
-    def __call__(self, stream):
-        connection_ops, stream = stream_extract(stream, ConnectionToken)
+    connection_parser = ConnectionParser()
 
-        connection_list = list(portmap(connection_ops).items())
+    def __call__(self, stream):
+        stream = self.connection_parser.extract(stream)
+        connection_list = list(self.connection_parser.get_links())
 
         if len(connection_list) > 0:
             outs, ins = zip(*connection_list)
@@ -118,22 +323,24 @@ class PartitionExpanderPass(object):
     """
     Propagate the partition of assigned to components to its ports.
     """
+
+    parent_parser = ParentParser()
+    partition_parser = PartitionParser()
+
     def __call__(self, stream):
         # Capture partitions, read components, yield all the rest
-        parent_ops, stream = stream_extract(stream, ParentElementToken)
-        partition_ops, stream = stream_divert(stream, PartitionToken)
+        stream = self.parent_parser.extract(stream)
+        stream = self.partition_parser.divert(stream)
         for op in stream: yield op
 
         # Generate parent map and partition map.
-        parent_map = parentmap(parent_ops)
-        partition_map = token_attr_map(partition_ops, 'element', 'partition')
+        partition_map = self.partition_parser.get_partitionmap()
 
         # Inherit partition settings by walking down the component tree in
         # topological order.
-        for element in toposort_flatten(graph.digraph(parent_map.items()), sort=False):
+        for element, parent in self.parent_parser.get_parentmap_toposort():
             try:
-                parent_element = parent_map[element]
-                parent_partition = partition_map[parent_element]
+                parent_partition = partition_map[parent]
             except KeyError:
                 continue
 
@@ -146,18 +353,21 @@ class PartitionExpanderPass(object):
 PartitionBounds = namedtuple('PartitionBounds', ['outs', 'ins'])
 
 class PartitionBoundsPass(object):
+    connection_parser = ConnectionParser()
+    partition_parser = PartitionParser()
+
     def __call__(self, stream):
         # Read partitions and connections re-yield evereything
-        connection_ops, stream = stream_extract(stream, ConnectionToken)
-        partition_ops, stream = stream_extract(stream, PartitionToken)
+        stream = self.connection_parser.extract(stream)
+        stream = self.partition_parser.extract(stream)
         for op in stream: yield op
 
         # Generate partition map.
-        partition_map = token_attr_map(partition_ops, 'element', 'partition')
+        partition_map = self.partition_parser.get_partitionmap()
         partitions = set(partition_map.values())
 
         partition_bounds = {name: PartitionBounds([], []) for name in partitions}
-        for port_out, port_in in portmap(connection_ops).items():
+        for port_out, port_in in self.connection_parser.get_links():
             partition_out = partition_map.get(port_out, None)
             partition_in = partition_map.get(port_in, None)
             if partition_out != partition_in:
@@ -172,32 +382,25 @@ class PartitionBoundsPass(object):
             yield AddTokenOp(PartitionBoundsToken(partition, bounds))
 
 class PartitionWorkerPass(object):
+    connection_parser = ConnectionParser()
+    partition_bounds_parser = PartitionBoundsParser()
+    partition_parser = PartitionParser()
+    partition_select_parser = PartitionSelectParser()
+
     def __call__(self, stream):
         # Capture connections, partition and partition bounds, yield rest.
-        connection_ops, stream = stream_divert(stream, ConnectionToken)
-        partition_bounds_ops, stream = stream_divert(stream, PartitionBoundsToken)
-        partition_ops, stream = stream_divert(stream, PartitionToken)
-        partition_select_ops, stream = stream_divert(stream, PartitionSelectToken)
+        stream = self.connection_parser.divert(stream)
+        stream = self.partition_bounds_parser.divert(stream)
+        stream = self.partition_parser.divert(stream)
+        stream = self.partition_select_parser.divert(stream)
         for op in stream: yield op
 
-        # Find the selected partition.
-        partition_select_tokens = list(token_attr_map(partition_select_ops, 'partition'))
-        if len(partition_select_tokens) != 1:
-            raise ParserError('Exactly one partition must be selected')
+        selected_partition = self.partition_select_parser.get_selected_partition()
 
-        selected_partition = partition_select_tokens[0]
+        partition_map = self.partition_parser.get_partitionmap()
+        partition_elements = set(elm for elm, part in partition_map.items() if part == selected_partition)
 
-        # Generate partition map.
-        partition_map = token_attr_map(partition_ops, 'element', 'partition')
-        partitions_elements = {}
-        for element, partition in partition_map.items():
-            partitions_elements.setdefault(partition, set()).add(element)
-
-        # Generate partition bounds map.
-        partition_bounds_map = token_attr_map(partition_bounds_ops,
-                                              'partition', 'bounds')
-
-        inner_ports = partitions_elements[selected_partition]
+        partition_bounds_map = self.partition_bounds_parser.get_partition_bounds()
         bounds = partition_bounds_map[selected_partition]
 
         innames = list(range(len(bounds.outs)))
@@ -212,12 +415,12 @@ class PartitionWorkerPass(object):
         inmap = dict(zip(bounds.ins, worker.outs))
 
         emitted_tokens = set()
-        for port_out, port_in in portmap(connection_ops).items():
-            if port_out in inner_ports and port_in in inner_ports:
+        for port_out, port_in in self.connection_parser.get_links():
+            if port_out in partition_elements and port_in in partition_elements:
                 yield AddTokenOp(ConnectionToken(port_out, port_in))
-            elif port_out in inner_ports:
+            elif port_out in partition_elements:
                 yield AddTokenOp(ConnectionToken(port_out, outmap[port_out]))
-            elif port_in in inner_ports:
+            elif port_in in partition_elements:
                 # A workers output port potentially replaces multiple outputs
                 # outside the partition. Hence it is necessary to guard against
                 # adding duplicate connections here.
@@ -227,22 +430,22 @@ class PartitionWorkerPass(object):
                     yield AddTokenOp(token)
 
 class PartitionControllersPass(object):
+    connection_parser = ConnectionParser()
+    partition_bounds_parser = PartitionBoundsParser()
+    partition_parser = PartitionParser()
+
     def __call__(self, stream):
         # Capture connections, partition and partition bounds, yield rest.
-        connection_ops, stream = stream_divert(stream, ConnectionToken)
-        partition_ops, stream = stream_divert(stream, PartitionToken)
-        partition_bounds_ops, stream = stream_divert(stream, PartitionBoundsToken)
+        stream = self.connection_parser.divert(stream)
+        stream = self.partition_bounds_parser.divert(stream)
+        stream = self.partition_parser.divert(stream)
         for op in stream: yield op
 
         outmap = dict()
         inmap = dict()
 
-        # Generate partition map.
-        partition_map = token_attr_map(partition_ops, 'element', 'partition')
-
-        # Generate partition bounds map.
-        partition_bounds_map = token_attr_map(partition_bounds_ops,
-                                              'partition', 'bounds')
+        partition_map = self.partition_parser.get_partitionmap()
+        partition_bounds_map = self.partition_bounds_parser.get_partition_bounds()
 
         for partition_name, bounds in partition_bounds_map.items():
             innames = list(range(len(bounds.ins)))
@@ -257,7 +460,7 @@ class PartitionControllersPass(object):
             inmap.update(zip(bounds.ins, controller.ins))
 
         # Purge/rewire connections.
-        for port_out, port_in in portmap(connection_ops).items():
+        for port_out, port_in in self.connection_parser.get_links():
             partition_out = partition_map.get(port_out, None)
             partition_in = partition_map.get(port_in, None)
             if partition_out is None and partition_in is None:
@@ -268,33 +471,38 @@ class PartitionControllersPass(object):
                 yield AddTokenOp(ConnectionToken(port_out, port_in))
 
 class ComponentsPurgePass(object):
+    connection_parser = ConnectionParser()
+    parent_parser = ParentParser()
+
     def __call__(self, stream):
         # Capture parents, read connections, yield the rest.
-        connection_ops, stream = stream_extract(stream, ConnectionToken)
-        parent_ops, stream = stream_divert(stream, ParentElementToken)
+        stream = self.connection_parser.extract(stream)
+        stream = self.parent_parser.divert(stream)
         for op in stream: yield op
 
-        # Initialize connected elements set with all connected ports and set up
-        # parent map.
-        connected_elements = set(ports(connection_ops))
-        parent_map = parentmap(parent_ops)
+        # Initialize connected elements set with all connected ports.
+        connected_elements = self.connection_parser.get_portset()
 
         # Walk the component tree from leaves to roots and collect connected
         # elements on the way down.
-        for child in toposort_flatten(graph.reverse(graph.digraph(parent_map.items())), sort=False):
-            if child in connected_elements and child in parent_map:
-                parent = parent_map[child]
+        for element, parent in self.parent_parser.get_parentmap_toposort(reverse=True):
+            if parent is not None and element in connected_elements:
                 connected_elements.add(parent)
-                yield AddTokenOp(ParentElementToken(child, parent))
+                yield AddTokenOp(ParentElementToken(element, parent))
 
 class EventHandlersPass(object):
+    connection_parser = ConnectionParser()
+    parent_parser = ParentParser()
+
     def __call__(self, stream):
         # Read components and connections, yield everything.
-        parent_ops, stream = stream_extract(stream, ParentElementToken)
-        connection_ops, stream = stream_extract(stream, ConnectionToken)
+        stream = self.connection_parser.extract(stream)
+        stream = self.parent_parser.extract(stream)
         for op in stream: yield op
 
-        comps = set(list(ports(connection_ops)) + list(treenodes(parent_ops)))
+        portset = self.connection_parser.get_portset()
+        nodeset = self.parent_parser.get_nodeset()
+        comps = portset.union(nodeset)
 
         # Build attach event handlers.
         is_attachable = lambda comp: \

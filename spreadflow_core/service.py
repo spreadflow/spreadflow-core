@@ -17,21 +17,16 @@ from spreadflow_core.scheduler import Scheduler, JobEvent
 from spreadflow_core.dsl.parser import \
     AliasResolverPass, \
     ComponentsPurgePass, \
+    ConnectionParser, \
+    EventHandlerParser, \
     EventHandlersPass, \
     PartitionBoundsPass, \
     PartitionControllersPass, \
     PartitionExpanderPass, \
     PartitionWorkerPass, \
-    PortsValidatorPass, \
-    portmap
-from spreadflow_core.dsl.stream import \
-    AddTokenOp, \
-    stream_extract, \
-    token_map
-from spreadflow_core.dsl.tokens import \
-    ConnectionToken, \
-    EventHandlerToken, \
-    PartitionSelectToken
+    PortsValidatorPass
+from spreadflow_core.dsl.stream import AddTokenOp
+from spreadflow_core.dsl.tokens import PartitionSelectToken
 
 class Options(usage.Options):
     optFlags = [
@@ -92,12 +87,13 @@ class SpreadFlowService(service.Service):
         if self.options['oneshot']:
             self._eventdispatcher.add_listener(JobEvent, 0, self._oneshot_job_event_handler)
 
-        connection_ops, stream = stream_extract(stream, ConnectionToken)
-        self._scheduler = Scheduler(portmap(connection_ops), self._eventdispatcher)
+        connection_parser = ConnectionParser()
+        stream = connection_parser.extract(stream)
+        self._scheduler = Scheduler(connection_parser.get_portmap(), self._eventdispatcher)
 
-        event_handler_ops, stream = stream_extract(stream, EventHandlerToken)
-        event_handlers = token_map(event_handler_ops).values()
-        for event_type, priority, callback in event_handlers:
+        event_handler_parser = EventHandlerParser()
+        stream = event_handler_parser.extract(stream)
+        for event_type, priority, callback in event_handler_parser.get_handlers():
             self._eventdispatcher.add_listener(event_type, priority, callback)
 
         if self.options['queuestatus']:

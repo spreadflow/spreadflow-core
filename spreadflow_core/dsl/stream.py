@@ -29,23 +29,6 @@ AddTokenOp = namedtuple('AddTokenOp', ['token'])
 SetDefaultTokenOp = namedtuple('SetDefaultTokenOp', ['token'])
 RemoveTokenOp = namedtuple('RemoveTokenOp', ['token'])
 
-def stream_extract(stream, token_class):
-    """
-    Copy all operations addressing tokens of the given class.
-    """
-    ops = list(stream)
-    extracted_stream = (op for op in ops if isinstance(op.token, token_class))
-    return extracted_stream, ops
-
-def stream_divert(stream, token_class):
-    """
-    Remove all operations addressing tokens of the given class from the stream.
-    """
-    ops = list(stream)
-    extracted_stream = (op for op in ops if isinstance(op.token, token_class))
-    remaining_stream = (op for op in ops if not isinstance(op.token, token_class))
-    return extracted_stream, remaining_stream
-
 def token_map(stream, keyfunc=lambda op: op.token, valuefunc=lambda op: op.token):
     """
     Apply all token operations in order and construct a mapping.
@@ -84,3 +67,50 @@ def token_attr_map(stream, keyattr, valueattr=None):
     extract_key = lambda op: getattr(op.token, keyattr)
     extract_value = lambda op: getattr(op.token, valueattr)
     return token_map(stream, extract_key, extract_value)
+
+class StreamBranch(object):
+    """
+    Abstract base class for parsers operating on selected tokens.
+    """
+
+    original = None
+    selected = None
+    rejected = None
+
+    def consume(self, stream):
+        """
+        Divides a stream into `selected` and `rejected` substreams.
+
+        Arguments:
+            - stream: A stream consisting of token operations.
+        """
+
+        # Copy incoming stream.
+        ops = list(stream)
+        self.original = iter(ops)
+        self.selected = (op for op in ops if self.predicate(op))
+        self.rejected = (op for op in ops if not self.predicate(op))
+
+    def extract(self, stream):
+        """
+        Processes a stream and returns an iterator over all operations.
+        """
+        self.consume(stream)
+        return self.original
+
+    def divert(self, stream):
+        """
+        Processes a stream and returns an iterator over rejected operations.
+        """
+        self.consume(stream)
+        return self.rejected
+
+    def predicate(self, operation):
+        """
+        Abstract filter method. Must be implemented in subclass.
+
+        Returns:
+            bool: True if the operation should be added to the selected stream,
+            False if it should be added to the rejected stream.
+        """
+        raise NotImplementedError()
