@@ -11,9 +11,7 @@ from __future__ import unicode_literals
 
 import unittest
 
-from spreadflow_core.dsl.context import Context, NoContextError
-from spreadflow_core.dsl.stream import \
-    AddTokenOp, RemoveTokenOp, SetDefaultTokenOp
+from spreadflow_core.script import Context, NoContextError
 
 class ContextTestCase(unittest.TestCase):
     """
@@ -41,21 +39,6 @@ class ContextTestCase(unittest.TestCase):
                 self.assertIs(ctx2, Context.top())
 
             self.assertIs(ctx, Context.top())
-
-    def test_token_operations(self):
-        """
-        Covers ctx.setdefault(), ctx.add() and ctx.remove()
-        """
-        with Context(self) as ctx:
-            ctx.setdefault('foo')
-            ctx.add('bar')
-            ctx.remove('baz')
-
-        self.assertListEqual(ctx.tokens, [
-            SetDefaultTokenOp('foo'),
-            AddTokenOp('bar'),
-            RemoveTokenOp('baz')
-        ])
 
     def test_raises_no_context(self):
         """
