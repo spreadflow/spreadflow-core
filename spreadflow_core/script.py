@@ -86,11 +86,6 @@ class DuplicatorTemplate(ProcessTemplate):
         yield AddTokenOp(ConnectionToken(process.out_duplicate, destination))
         yield SetDefaultTokenOp(LabelToken(process, 'Copy to "{:s}"'.format(destination)))
 
-def duplicate(*destinations):
-    for dest in destinations:
-        for template in DuplicatorTemplate(destination=dest):
-            yield template
-
 CONTEXT_STACK = []
 
 class NoContextError(Exception):
