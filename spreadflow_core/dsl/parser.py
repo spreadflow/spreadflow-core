@@ -78,8 +78,11 @@ class ConnectionParser(TokenClassPredicateMixin, StreamBranch):
     def get_portmap(self):
         return token_attr_map(self.selected, 'port_out', 'port_in')
 
+    def get_links(self):
+        return self.get_portmap().items()
+
     def get_portset(self):
-        all_connections = self.get_portmap().items()
+        all_connections = self.get_links()
         return set(itertools.chain(*zip(*all_connections)))
 
 class DefaultInputParser(TokenClassPredicateMixin, StreamBranch):
@@ -163,7 +166,7 @@ class AliasResolverPass(object):
         default_outputs = self.default_outs_parser.get_portmap()
 
         # Generate connection operations.
-        for port_out, port_in in self.connection_parser.get_portmap().items():
+        for port_out, port_in in self.connection_parser.get_links():
             while True:
                 if isinstance(port_out, StringType):
                     port_out = aliases[port_out]
@@ -191,7 +194,7 @@ class PortsValidatorPass(object):
 
     def __call__(self, stream):
         stream = self.connection_parser.extract(stream)
-        connection_list = list(self.connection_parser.get_portmap().items())
+        connection_list = list(self.connection_parser.get_links())
 
         if len(connection_list) > 0:
             outs, ins = zip(*connection_list)
@@ -257,7 +260,7 @@ class PartitionBoundsPass(object):
         partitions = set(partition_map.values())
 
         partition_bounds = {name: PartitionBounds([], []) for name in partitions}
-        for port_out, port_in in self.connection_parser.get_portmap().items():
+        for port_out, port_in in self.connection_parser.get_links():
             partition_out = partition_map.get(port_out, None)
             partition_in = partition_map.get(port_in, None)
             if partition_out != partition_in:
@@ -305,7 +308,7 @@ class PartitionWorkerPass(object):
         inmap = dict(zip(bounds.ins, worker.outs))
 
         emitted_tokens = set()
-        for port_out, port_in in self.connection_parser.get_portmap().items():
+        for port_out, port_in in self.connection_parser.get_links():
             if port_out in inner_ports and port_in in inner_ports:
                 yield AddTokenOp(ConnectionToken(port_out, port_in))
             elif port_out in inner_ports:
@@ -350,7 +353,7 @@ class PartitionControllersPass(object):
             inmap.update(zip(bounds.ins, controller.ins))
 
         # Purge/rewire connections.
-        for port_out, port_in in self.connection_parser.get_portmap().items():
+        for port_out, port_in in self.connection_parser.get_links():
             partition_out = partition_map.get(port_out, None)
             partition_in = partition_map.get(port_in, None)
             if partition_out is None and partition_in is None:
