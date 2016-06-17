@@ -108,6 +108,14 @@ class StreamBranch(object):
         self.rejected = (op for op in ops if not self.predicate(op))
         return self
 
+    def extract(self, stream):
+        self.push(stream)
+        return self.stream
+
+    def divert(self, stream):
+        self.push(stream)
+        return self.rejected
+
     def predicate(self, operation):
         """
         Abstract filter method. Must be implemented in subclass.
