@@ -6,6 +6,8 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import unicode_literals
 
+import re
+
 from twisted.internet import defer, protocol
 from twisted.internet import interfaces
 from twisted.internet.endpoints import clientFromString, serverFromString
@@ -204,3 +206,30 @@ class ServerEndpointMixin(object):
         if self.peer:
             yield self.peer.loseConnection()
         self.peer = None
+
+class StrportGeneratorMixin(object):
+    """
+    A mixin which simplifies generating strport strings.
+    """
+
+    STRPORT_ESCAPE = r'([:=\\])'
+
+    def strport_generate(self, name, *args, **kwds):
+        """
+        Returns a strport string following the method signature.
+        """
+        result = self._strport_escape(name)
+
+        for arg in args:
+            if arg is not None:
+                result = '{:s}:{:s}'.format(result, self._strport_escape(arg))
+
+        for key, value in kwds.items():
+            if value is not None:
+                result = '{:s}:{:s}={:s}'.format(result, key,
+                                                 self._strport_escape(value))
+
+        return result
+
+    def _strport_escape(self, value):
+        return re.sub(self.STRPORT_ESCAPE, r'\\\1', str(value))
