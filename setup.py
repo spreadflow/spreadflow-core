@@ -14,6 +14,7 @@ setup(
     url='https://github.com/znerol/spreadflow-core',
     packages=[
         'spreadflow_core',
+        'spreadflow_core.dsl',
         'spreadflow_core.scripts',
         'spreadflow_core.test',
         'twisted.plugins'
