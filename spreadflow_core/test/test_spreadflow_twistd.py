@@ -17,11 +17,6 @@ import unittest
 
 from spreadflow_core.test.util import StreamsReader
 
-try:
-    import queue
-except ImportError:
-    import Queue as queue
-
 FIXTURE_DIRECTORY = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'fixtures')
 
 class SpreadflowTwistdIntegrationTestCase(unittest.TestCase):
