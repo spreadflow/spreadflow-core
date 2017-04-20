@@ -8,7 +8,9 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import unicode_literals
 
+import imp
 import itertools
+import sys
 from collections import Counter, namedtuple
 from toposort import toposort_flatten
 
@@ -22,6 +24,7 @@ from spreadflow_core.dsl.stream import \
 from spreadflow_core.dsl.tokens import \
     AliasToken, \
     ComponentToken, \
+    TemplateFactoryToken, \
     ConnectionToken, \
     DefaultInputToken, \
     DefaultOutputToken, \
@@ -41,6 +44,20 @@ except NameError:
 
 class ParserError(Exception):
     pass
+
+class TemplateFactoryParser(StreamBranch):
+    """
+    Extracts a list of template factories from a stream of operations.
+    """
+
+    def predicate(self, operation):
+        return isinstance(operation.token, TemplateFactoryToken)
+
+    def get_template_factories(self):
+        """
+        Returns an iterator over configured template tokens.
+        """
+        return token_map(self.selected).values()
 
 class AliasParser(StreamBranch):
     """
@@ -252,6 +269,26 @@ class PartitionSelectParser(StreamBranch):
             raise ParserError('Exactly one partition must be selected')
 
         return partition_select_tokens[0]
+
+class TemplateFactoryPass(object):
+    factory_parser = TemplateFactoryParser()
+
+    def __call__(self, stream):
+        stream = self.factory_parser.divert(stream)
+        for op in stream: yield op
+
+        factories = self.factory_parser.get_template_factories()
+
+        for name, module, path in factories:
+            try:
+                mod = sys.modules[module]
+            except KeyError:
+                with open(path, 'r') as f:
+                    mod = imp.load_source(module, path, f)
+
+            template_factory = getattr(mod, name)
+
+            for op in template_factory(): yield op
 
 class AliasResolverPass(object):
     alias_parser = AliasParser()

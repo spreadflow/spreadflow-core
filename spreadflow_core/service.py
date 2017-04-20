@@ -24,7 +24,8 @@ from spreadflow_core.dsl.parser import \
     PartitionControllersPass, \
     PartitionExpanderPass, \
     PartitionWorkerPass, \
-    PortsValidatorPass
+    PortsValidatorPass, \
+    TemplateFactoryPass
 from spreadflow_core.dsl.stream import AddTokenOp
 from spreadflow_core.dsl.tokens import PartitionSelectToken
 
@@ -63,6 +64,7 @@ class SpreadFlowService(service.Service):
         stream = config_eval(confpath)
 
         pipeline = list()
+        pipeline.append(TemplateFactoryPass())
         pipeline.append(AliasResolverPass())
         pipeline.append(PortsValidatorPass())
 
