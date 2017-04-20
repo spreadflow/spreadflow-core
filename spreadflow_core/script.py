@@ -6,12 +6,9 @@ import collections
 import inspect
 import abc
 
-from spreadflow_core.component import Compound
 from spreadflow_core.dsl.stream import AddTokenOp, SetDefaultTokenOp
-from spreadflow_core.dsl.parser import ComponentParser
 from spreadflow_core.dsl.tokens import \
     AliasToken, \
-    ComponentToken, \
     ConnectionToken, \
     DefaultInputToken, \
     DefaultOutputToken, \
@@ -39,31 +36,62 @@ class TemplateBase(collections.Iterable):
         """
 
 class ComponentTemplate(TemplateBase):
-    pass
+    component = None
+
+    def get_component(self):
+        """
+        Returns the component.
+        """
+        if self.component is None:
+            self.component = self.create_component()
+        return self.component
+
+    @abc.abstractmethod
+    def create_component(self):
+        """
+        Constructs the component.
+        """
 
 class ChainTemplate(ComponentTemplate):
     chain = None
-    component_parser = ComponentParser()
 
     def __init__(self, chain=None):
         if chain is not None:
-            self.chain = chain
+            self.chain = list(chain)
 
-    def apply(self):
+    class _ChainContainer(object):
+        """
+        The chain process wrapping other processes.
+        """
+
+        def __init__(self, children):
+            assert len(children) == len(set(children)), 'Members must be unique'
+            self.children = children
+
+        def get_children(self):
+            return self.children
+
+    def create_component(self):
+        # Apply (sub)templates if necessary.
         elements = []
 
-        # Apply (sub)templates if necessary.
         for element in self.chain:
             if isinstance(element, ComponentTemplate):
-                for operation in self.component_parser.divert(element):
-                    yield operation
-                elements.append(self.component_parser.get_component())
+                elements.append(element.get_component())
             else:
                 elements.append(element)
 
-        component = Compound(elements)
-        yield AddTokenOp(ComponentToken(component))
+        return self._ChainContainer(elements)
 
+    def apply(self):
+        component = self.get_component()
+
+        for element in self.chain:
+            if isinstance(element, ComponentTemplate):
+                for operation in element:
+                    yield operation
+
+        elements = component.get_children()
         for element in elements:
             yield AddTokenOp(ParentElementToken(element, component))
 
@@ -79,23 +107,24 @@ class ChainTemplate(ComponentTemplate):
         yield AddTokenOp(DefaultOutputToken(component, elements[-1]))
 
 class DuplicatorTemplate(ComponentTemplate):
-    component_parser = ComponentParser()
     destination = None
 
     def __init__(self, destination=None):
         if destination is not None:
             self.destination = destination
 
+    def create_component(self):
+        return Duplicator()
+
     def apply(self):
         # Apply (sub)template if necessary.
         destination = self.destination
         if isinstance(destination, ComponentTemplate):
-            for operation in self.component_parser.divert(destination):
+            for operation in destination:
                 yield operation
-            destination = self.component_parser.get_component()
+            destination = destination.get_component()
 
-        process = Duplicator()
-        yield AddTokenOp(ComponentToken(process))
+        process = self.get_component()
 
         # Set the parent for the secondary output.
         yield AddTokenOp(ParentElementToken(process.out_duplicate, process))
@@ -116,10 +145,9 @@ class ProcessTemplate(ComponentTemplate):
     label = None
     description = None
     partition = None
+    template = None
 
-    component_parser = ComponentParser()
-
-    def apply(self):
+    def create_template(self):
         if isinstance(self._wrapped_factory, type) and issubclass(self._wrapped_factory, ComponentTemplate):
             template = self._wrapped_factory()
         elif isinstance(self._wrapped_factory, object) and callable(self._wrapped_factory):
@@ -128,11 +156,23 @@ class ProcessTemplate(ComponentTemplate):
             raise ProcessDecoratorError('Process decorator only works on '
                                         'subclasses of ComponentTemplate or '
                                         'functions')
+        return template
 
-        for operation in self.component_parser.divert(template):
+    def get_template(self):
+        if self.template is None:
+            self.template = self.create_template()
+        return self.template
+
+    def create_component(self):
+        template = self.get_template()
+        return template.get_component()
+
+    def apply(self):
+        template = self.get_template()
+        for operation in template:
             yield operation
 
-        process = self.component_parser.get_component()
+        process = self.get_component()
 
         yield SetDefaultTokenOp(AliasToken(process, self._wrapped_factory.__name__))
         yield SetDefaultTokenOp(DescriptionToken(process, inspect.cleandoc(self._wrapped_factory.__doc__ or '')))

@@ -11,18 +11,16 @@ from __future__ import unicode_literals
 
 import unittest
 
-from spreadflow_core.component import Compound
 from spreadflow_core.dsl.parser import ParentParser
 from spreadflow_core.dsl.stream import SetDefaultTokenOp, AddTokenOp
 from spreadflow_core.dsl.tokens import \
     AliasToken, \
-    ComponentToken, \
     ConnectionToken, \
     DescriptionToken, \
     LabelToken, \
     ParentElementToken, \
     PartitionToken
-from spreadflow_core.script import Process, ComponentTemplate
+from spreadflow_core.script import Process, ComponentTemplate, ChainTemplate
 
 class ProcessDecoratorTestCase(unittest.TestCase):
     """
@@ -41,7 +39,10 @@ class ProcessDecoratorTestCase(unittest.TestCase):
             Docs for the trivial process.
             """
             def apply(self):
-                yield AddTokenOp(ComponentToken(process))
+                return iter([])
+
+            def create_component(self):
+                return process
 
         tokens = list(TrivialProcess())
 
@@ -70,7 +71,7 @@ class ProcessDecoratorTestCase(unittest.TestCase):
         self.assertEqual(len(parentmap), 1)
         _, process = parentmap.popitem()
 
-        self.assertIsInstance(process, Compound)
+        self.assertIsInstance(process, ChainTemplate._ChainContainer)
 
         self.assertIn(SetDefaultTokenOp(AliasToken(process, 'trivial_proc')), tokens)
         self.assertIn(SetDefaultTokenOp(LabelToken(process, 'trivial_proc')), tokens)
@@ -99,7 +100,7 @@ class ProcessDecoratorTestCase(unittest.TestCase):
         self.assertEqual(len(parentmap), 3)
         _, process = parentmap.popitem()
 
-        self.assertIsInstance(process, Compound)
+        self.assertIsInstance(process, ChainTemplate._ChainContainer)
 
         self.assertIn(AddTokenOp(ConnectionToken(port1, port2)), tokens)
         self.assertIn(AddTokenOp(ConnectionToken(port2, port3)), tokens)
@@ -120,7 +121,10 @@ class ProcessDecoratorTestCase(unittest.TestCase):
             Docs for the trivial process.
             """
             def apply(self):
-                yield AddTokenOp(ComponentToken(process))
+                return iter([])
+
+            def create_component(self):
+                return process
 
         tokens = list(TrivialProcess())
         self.assertIn(AddTokenOp(AliasToken(process, 'trivproc')), tokens)
@@ -146,7 +150,9 @@ class ProcessDecoratorTestCase(unittest.TestCase):
             """
             def apply(self):
                 yield AddTokenOp(token)
-                yield AddTokenOp(ComponentToken(process))
+
+            def create_component(self):
+                return process
 
         tokens = list(TrivialProcess())
 
