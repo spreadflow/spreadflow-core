@@ -11,6 +11,11 @@ from __future__ import unicode_literals
 
 import collections
 
+try:
+    from collections.abc import Iterator
+except ImportError:
+    from collections import Iterator
+
 from twisted.internet import defer
 
 class QueueNoneReady(Exception):
@@ -19,7 +24,7 @@ class QueueNoneReady(Exception):
 Job = collections.namedtuple("Job", ["channel", "func", "args", "kwds"])
 Entry = collections.namedtuple("Entry", ["deferred", "job"])
 
-class JobQueue(collections.Iterator):
+class JobQueue(Iterator):
     """Cooperative job queue.
 
     A job queue (and iterator) specifically designed for the twisted

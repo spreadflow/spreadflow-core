@@ -2,8 +2,12 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import unicode_literals
 
-import collections
 import os
+
+try:
+    from collections.abc import Iterable
+except ImportError:
+    from collections import Iterable
 
 from tempfile import NamedTemporaryFile
 from unittest import TestCase
@@ -19,4 +23,4 @@ class ConfigTestCase(TestCase):
         tokens = config_eval(tmpfile.name)
         os.unlink(tmpfile.name)
 
-        self.assertIsInstance(tokens, collections.Iterable)
+        self.assertIsInstance(tokens, Iterable)

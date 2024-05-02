@@ -2,3 +2,4 @@ coveralls
 pyflakes
 pylint<1.5
 testtools>=2.2.0
+fixtures
