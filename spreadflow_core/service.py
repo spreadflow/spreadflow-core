@@ -155,6 +155,6 @@ class SpreadFlowQueuestatusLogger(object):
 
         dirname, basename = os.path.split(self.path)
         temp = tempfile.NamedTemporaryFile(prefix=basename, dir=dirname, delete=False)
-        temp.write(status)
+        temp.write(status.encode("utf-8"))
         temp.close()
         os.rename(temp.name, self.path)
