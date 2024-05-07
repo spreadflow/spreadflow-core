@@ -6,6 +6,11 @@ branch = True
 source_pkgs =
     spreadflow_core
 omit =
-    spreadflow_core/test/*
     /tmp/**
+    spreadflow_core/test/**
 parallel = True
+
+[report]
+omit =
+    /tmp/**
+    spreadflow_core/test/**
