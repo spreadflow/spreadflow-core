@@ -8,7 +8,7 @@ on:
     branches: [ "stable" ]
 
 jobs:
-  build:
+  test:
 
     runs-on: ubuntu-latest
     strategy:
@@ -35,3 +35,19 @@ jobs:
       run: |
         COVERAGE_PROCESS_START=`pwd`/.coveragerc trial spreadflow_core
         coverage combine `pwd` `pwd`/_trial_temp
+    - name: Coveralls Parallel
+      uses: coverallsapp/github-action@v2
+      with:
+        flag-name: run-${{ join(matrix.*, '-') }}
+        parallel: true
+
+  finish:
+    needs: test
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    steps:
+    - name: Coveralls Finished
+      uses: coverallsapp/github-action@v2
+      with:
+        parallel-finished: true
+        carryforward: "run-3.7,run-3.9,run-3.11"
