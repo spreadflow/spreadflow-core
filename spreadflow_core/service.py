@@ -101,7 +101,7 @@ class SpreadFlowService(service.Service):
             statuslog.watch(1, self._scheduler)
             globalLogPublisher.addObserver(statuslog.logstatus)
 
-        self._scheduler.run().addBoth(self._stop)
+        self._scheduler.run().addBoth(self._stop)  # pylint: disable=no-member
 
     def stopService(self):
         super(SpreadFlowService, self).stopService()
@@ -110,7 +110,7 @@ class SpreadFlowService(service.Service):
     def _stop(self, result):
         from twisted.internet import reactor
         try:
-            reactor.stop()
+            reactor.stop()  # pylint: disable=no-member
         except error.ReactorNotRunning:
             pass
         return result
