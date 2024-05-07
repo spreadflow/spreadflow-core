@@ -3,8 +3,14 @@
 
 [run]
 branch = True
-source = spreadflow_core
+source_pkgs =
+    spreadflow_core
 omit =
-    spreadflow_core/test/*
-    */spreadflow.conf
+    /tmp/**
+    spreadflow_core/test/**
 parallel = True
+
+[report]
+omit =
+    /tmp/**
+    spreadflow_core/test/**
