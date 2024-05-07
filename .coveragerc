@@ -6,4 +6,5 @@ branch = True
 source = spreadflow_core
 omit =
     spreadflow_core/test/*
+    */spreadflow.conf
 parallel = True

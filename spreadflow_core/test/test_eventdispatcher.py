@@ -92,7 +92,7 @@ class EventDispatcherTestCase(TestCase):
 
         event = TestEvent()
         d = dispatcher.dispatch(event)
-        self.assertTrue(d.called)
+        self.assertTrue(d.called)  # pylint: disable=no-member
 
         test_callback_prio_0_cb_0.assert_called_once_with(event)
         test_callback_prio_0_cb_1.assert_called_once_with(event)
@@ -108,7 +108,7 @@ class EventDispatcherTestCase(TestCase):
 
         event = TestEvent()
         d = dispatcher.dispatch(event)
-        self.assertTrue(d.called)
+        self.assertTrue(d.called)  # pylint: disable=no-member
 
         test_callback_prio_0_cb_0.assert_called_once_with(event)
         self.assertEqual(test_callback_prio_0_cb_1.call_count, 0)
@@ -173,6 +173,6 @@ class EventDispatcherTestCase(TestCase):
 
         event = TestEvent()
         d = dispatcher.dispatch(event)
-        self.assertTrue(d.called)
+        self.assertTrue(d.called)  # pylint: disable=no-member
 
         callback.assert_called_once_with(event, 'hello', 'world', some='kwds', also='here')
