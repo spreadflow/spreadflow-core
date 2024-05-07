@@ -33,6 +33,7 @@ jobs:
         pyflakes spreadflow_core
     - name: Test with trial
       run: |
+        python -c 'import sysconfig; from pathlib import Path; Path(sysconfig.get_paths()["purelib"]).joinpath("coverage.pth").write_text("import coverage; coverage.process_startup()\n")'
         COVERAGE_PROCESS_START=`pwd`/.coveragerc trial spreadflow_core
         coverage combine `pwd` `pwd`/_trial_temp
         coverage xml
