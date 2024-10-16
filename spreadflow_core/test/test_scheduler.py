@@ -70,10 +70,10 @@ class SchedulerTestCase(TestCase):
         run_deferred = self.scheduler.run(self.clock)
         assert_that(run_deferred, twistedsupport.has_no_result())
 
-        self.assertEquals(job_handler.call_count, 0)
+        self.assertEqual(job_handler.call_count, 0)
         attach_handler.assert_called_once_with(AttachEvent(scheduler=self.scheduler, reactor=self.clock))
-        self.assertEquals(join_handler.call_count, 0)
-        self.assertEquals(detach_handler.call_count, 0)
+        self.assertEqual(join_handler.call_count, 0)
+        self.assertEqual(detach_handler.call_count, 0)
 
         job_handler.reset_mock()
         attach_handler.reset_mock()
@@ -85,11 +85,11 @@ class SchedulerTestCase(TestCase):
         self.clock.advance(self.epsilon)
         assert_that(run_deferred, twistedsupport.has_no_result())
 
-        self.assertEquals(job_handler.call_count, 0)
-        self.assertEquals(attach_handler.call_count, 0)
-        self.assertEquals(start_handler.call_count, 0)
-        self.assertEquals(join_handler.call_count, 0)
-        self.assertEquals(detach_handler.call_count, 0)
+        self.assertEqual(job_handler.call_count, 0)
+        self.assertEqual(attach_handler.call_count, 0)
+        self.assertEqual(start_handler.call_count, 0)
+        self.assertEqual(join_handler.call_count, 0)
+        self.assertEqual(detach_handler.call_count, 0)
 
         job_handler.reset_mock()
         attach_handler.reset_mock()
@@ -101,11 +101,11 @@ class SchedulerTestCase(TestCase):
         self.scheduler.stop('some reason')
         assert_that(run_deferred, twistedsupport.succeeded(matchers.Equals('some reason')))
 
-        self.assertEquals(job_handler.call_count, 0)
-        self.assertEquals(attach_handler.call_count, 0)
-        self.assertEquals(start_handler.call_count, 0)
-        self.assertEquals(join_handler.call_count, 0)
-        self.assertEquals(detach_handler.call_count, 0)
+        self.assertEqual(job_handler.call_count, 0)
+        self.assertEqual(attach_handler.call_count, 0)
+        self.assertEqual(start_handler.call_count, 0)
+        self.assertEqual(join_handler.call_count, 0)
+        self.assertEqual(detach_handler.call_count, 0)
 
         job_handler.reset_mock()
         attach_handler.reset_mock()
@@ -118,9 +118,9 @@ class SchedulerTestCase(TestCase):
         self.clock.advance(self.epsilon)
         assert_that(join_deferred, twistedsupport.succeeded(matchers.Always()))
 
-        self.assertEquals(job_handler.call_count, 0)
-        self.assertEquals(attach_handler.call_count, 0)
-        self.assertEquals(start_handler.call_count, 0)
+        self.assertEqual(job_handler.call_count, 0)
+        self.assertEqual(attach_handler.call_count, 0)
+        self.assertEqual(start_handler.call_count, 0)
         detach_handler.assert_called_once_with(DetachEvent(scheduler=self.scheduler))
 
     def test_run_job(self):
@@ -138,23 +138,23 @@ class SchedulerTestCase(TestCase):
         self.scheduler.send('some item', port_out)
 
         expected_job = Job(port_in, 'some item', self.scheduler.send, port_out)
-        self.assertEquals(job_handler.call_count, 1)
+        self.assertEqual(job_handler.call_count, 1)
         assert_that(job_handler.call_args, MatchesInvocation(
             MatchesEvent(JobEvent,
                          scheduler=matchers.Equals(self.scheduler),
                          job=matchers.Equals(expected_job),
                          completed=twistedsupport.has_no_result())
         ))
-        self.assertEquals(port_in.call_count, 0)
+        self.assertEqual(port_in.call_count, 0)
 
-        self.assertEquals(len(list(self.scheduler.pending)), 1)
+        self.assertEqual(len(list(self.scheduler.pending)), 1)
 
         # Trigger queue run.
         self.clock.advance(self.epsilon)
 
         port_in.assert_called_once_with('some item', self.scheduler.send)
 
-        self.assertEquals(len(list(self.scheduler.pending)), 0)
+        self.assertEqual(len(list(self.scheduler.pending)), 0)
 
     def test_fail_job(self):
         """
@@ -196,17 +196,17 @@ class SchedulerTestCase(TestCase):
         run_deferred = self.scheduler.run(self.clock)
         self.scheduler.send('some item', port_out)
 
-        self.assertEquals(len(list(self.scheduler.pending)), 1)
+        self.assertEqual(len(list(self.scheduler.pending)), 1)
 
         self.scheduler.stop('bye!')
 
-        self.assertEquals(len(list(self.scheduler.pending)), 1)
+        self.assertEqual(len(list(self.scheduler.pending)), 1)
 
         join_deferred = self.scheduler.join()
         self.clock.advance(self.epsilon)
         assert_that(join_deferred, twistedsupport.succeeded(matchers.Always()))
         assert_that(run_deferred, twistedsupport.succeeded(matchers.Equals('bye!')))
 
-        self.assertEquals(len(list(self.scheduler.pending)), 0)
+        self.assertEqual(len(list(self.scheduler.pending)), 0)
 
-        self.assertEquals(port_in.call_count, 0)
+        self.assertEqual(port_in.call_count, 0)

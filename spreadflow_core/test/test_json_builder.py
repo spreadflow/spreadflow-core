@@ -25,7 +25,7 @@ class JsonBuilderTestCase(unittest.TestCase):
         builder = JsonMessageBuilder()
 
         result = builder.message({'msg': 'hello world'})
-        self.assertEquals(b'{"msg": "hello world"}\n', result)
+        self.assertEqual(b'{"msg": "hello world"}\n', result)
 
         result = builder.message({'x': 42})
-        self.assertEquals(b'{"x": 42}\n', result)
+        self.assertEqual(b'{"x": 42}\n', result)
