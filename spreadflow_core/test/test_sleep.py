@@ -22,30 +22,30 @@ class SleepTestCase(TestCase):
         msg1 = 'a message'
         send1 = Mock(spec=Scheduler.send)
         d1 = sut(msg1, send1)
-        self.assertEquals(send1.call_count, 0)
+        self.assertEqual(send1.call_count, 0)
         self.assertFalse(d1.called)  # pylint: disable=no-member
 
         clock.advance(1)
 
-        self.assertEquals(send1.call_count, 0)
+        self.assertEqual(send1.call_count, 0)
         self.assertFalse(d1.called)  # pylint: disable=no-member
 
         msg2 = 'a second message'
         send2 = Mock(spec=Scheduler.send)
         d2 = sut(msg2, send2)
-        self.assertEquals(send2.call_count, 0)
+        self.assertEqual(send2.call_count, 0)
         self.assertFalse(d1.called)  # pylint: disable=no-member
 
         clock.advance(3)
 
-        self.assertEquals(send1.call_count, 1)
-        self.assertEquals(send1.call_args, call(msg1, sut))
+        self.assertEqual(send1.call_count, 1)
+        self.assertEqual(send1.call_args, call(msg1, sut))
         self.assertTrue(d1.called)  # pylint: disable=no-member
 
-        self.assertEquals(send2.call_count, 0)
+        self.assertEqual(send2.call_count, 0)
 
         clock.advance(4)
 
-        self.assertEquals(send2.call_count, 1)
-        self.assertEquals(send2.call_args, call(msg2, sut))
+        self.assertEqual(send2.call_count, 1)
+        self.assertEqual(send2.call_args, call(msg2, sut))
         self.assertTrue(d2.called)  # pylint: disable=no-member

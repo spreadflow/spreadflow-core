@@ -22,23 +22,23 @@ class ThrottleTestCase(TestCase):
         msg = 'a message'
         send = Mock(spec=Scheduler.send)
         sut(msg, send)
-        self.assertEquals(send.call_count, 1)
-        self.assertEquals(send.call_args, call(msg, sut))
+        self.assertEqual(send.call_count, 1)
+        self.assertEqual(send.call_args, call(msg, sut))
 
         clock.advance(1)
 
         msg = 'another message, should be dropped'
         send = Mock(spec=Scheduler.send)
         sut(msg, send)
-        self.assertEquals(send.call_count, 0)
+        self.assertEqual(send.call_count, 0)
 
         clock.advance(3)
 
         msg = 'a third message'
         send = Mock(spec=Scheduler.send)
         sut(msg, send)
-        self.assertEquals(send.call_count, 1)
-        self.assertEquals(send.call_args, call(msg, sut))
+        self.assertEqual(send.call_count, 1)
+        self.assertEqual(send.call_args, call(msg, sut))
 
     def test_with_initial_delay(self):
         clock = task.Clock()
@@ -50,12 +50,12 @@ class ThrottleTestCase(TestCase):
         msg = 'an early message, should be dropped'
         send = Mock(spec=Scheduler.send)
         sut(msg, send)
-        self.assertEquals(send.call_count, 0)
+        self.assertEqual(send.call_count, 0)
 
         clock.advance(2)
 
         msg = 'another message'
         send = Mock(spec=Scheduler.send)
         sut(msg, send)
-        self.assertEquals(send.call_count, 1)
-        self.assertEquals(send.call_args, call(msg, sut))
+        self.assertEqual(send.call_count, 1)
+        self.assertEqual(send.call_args, call(msg, sut))

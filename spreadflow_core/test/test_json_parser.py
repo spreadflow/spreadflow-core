@@ -28,10 +28,10 @@ class JsonParserTestCase(unittest.TestCase):
         msg2 = b'{"x": 42}\n'
 
         parser.push(msg1)
-        self.assertEquals([{'msg': 'hello world'}], list(parser.messages()))
+        self.assertEqual([{'msg': 'hello world'}], list(parser.messages()))
 
         parser.push(msg2)
-        self.assertEquals([{'x': 42}], list(parser.messages()))
+        self.assertEqual([{'x': 42}], list(parser.messages()))
 
     def test_parse_partial_msgs(self):
         """
@@ -52,7 +52,7 @@ class JsonParserTestCase(unittest.TestCase):
             for parsed_message in parser.messages():
                 actual_messages.append(parsed_message)
 
-        self.assertEquals([{'msg': 'hello world'}, {'x': 42}], actual_messages)
+        self.assertEqual([{'msg': 'hello world'}, {'x': 42}], actual_messages)
 
     def test_buffer_exceeded(self):
         """

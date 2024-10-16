@@ -37,8 +37,7 @@ class StreamsReader(object):
         self._threads = None
 
     def drain(self, timeout=MAXWAIT):
-        if timeout > 0:
-            deadline = time.time() + timeout
+        deadline = time.time() + timeout if timeout > 0 else 0
 
         while True:
             if timeout > 0 and time.time() > deadline:

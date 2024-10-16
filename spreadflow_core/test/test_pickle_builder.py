@@ -25,7 +25,7 @@ class PickleBuilderTestCase(unittest.TestCase):
         builder = PickleMessageBuilder(2)
 
         result = builder.message({'msg': 'hello world'})
-        self.assertEquals(b'\x80\x02K#.\x80\x02}q\x00X\x03\x00\x00\x00msgq\x01X\x0b\x00\x00\x00hello worldq\x02s.', result)
+        self.assertEqual(b'\x80\x02K#.\x80\x02}q\x00X\x03\x00\x00\x00msgq\x01X\x0b\x00\x00\x00hello worldq\x02s.', result)
 
         result = builder.message({'x': 42})
-        self.assertEquals(b'\x80\x02K\x11.\x80\x02}q\x00X\x01\x00\x00\x00xq\x01K*s.', result)
+        self.assertEqual(b'\x80\x02K\x11.\x80\x02}q\x00X\x01\x00\x00\x00xq\x01K*s.', result)
