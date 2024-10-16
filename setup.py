@@ -30,7 +30,7 @@ setup(
         ]
     },
     install_requires=[
-        'Twisted<23',
+        'Twisted',
         'toposort',
         'zope.interface'
     ],
